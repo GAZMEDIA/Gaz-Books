@@ -78,7 +78,8 @@
             <option value="gfree">Google free (no key, about 250 languages)</option>
             <option value="offline">On this computer (free, about 100 languages, works offline)</option>
             <option value="google">Google with your own key</option>
-            <option value="claude">Claude (any other language, type its name)</option>
+            <option value="gemini">Gemini (free Google key, any language, type its name)</option>
+            <option value="claude">Claude (paid key, any language, type its name)</option>
           </select>
         </label>
         <label id="langPick">Language
@@ -142,7 +143,7 @@
       <label>Subtitle<input id="cSubtitle"></label>
       <label>Author<input id="cAuthor"></label>
     </div>
-    <div class="row"><button class="primary" id="aiBtn">✨ Write the back cover for me</button><span class="hint" id="aiNote">Uses Claude (add your key in Settings). Reads the start of your book.</span></div>
+    <div class="row"><button class="primary" id="aiBtn">✨ Write the back cover for me</button><span class="hint" id="aiNote">Uses Gemini (free key, add it in Settings) or Claude. Reads the start of your book.</span></div>
     <label>Tagline (one strong line)<input id="cTagline" placeholder="One river. One night. Every secret rising."></label>
     <label>Back cover description<textarea id="cBlurb" rows="6"></textarea></label>
     <label>About the author (optional)<textarea id="cBio" rows="2"></textarea></label>
@@ -195,11 +196,14 @@
 
 <dialog id="settings">
   <h2>Settings</h2>
-  <p class="hint">Keys are only needed for translating. They are stored on this computer, locked to your Windows account.</p>
-  <label>Google Translate key<input id="googleKey" type="password" placeholder="AIza…"></label>
+  <p class="hint">All keys are optional: “Google free” and “On this computer” translate with no key. Keys are stored on this computer, locked to your Windows account.</p>
+  <label>Google Translate key (optional, paid)<input id="googleKey" type="password" placeholder="AIza…"></label>
   <p class="hint">Get one: Google Cloud Console › APIs &amp; Services › Enable “Cloud Translation API” › Credentials › Create API key. About $20 per million letters (a 300-page novel is about $10 per language).</p>
-  <label>Claude key<input id="claudeKey" type="password" placeholder="sk-ant-…"></label>
-  <p class="hint">For translating and writing back covers. Get one at console.anthropic.com › API keys.</p>
+  <label>Gemini key (free)<input id="geminiKey" type="password" placeholder="AIza…"></label>
+  <div class="row"><button id="geminiGet">Get my free Gemini key</button><span class="hint">Sign in with your Gmail, click “Create API key”, copy it and paste it here.</span></div>
+  <p class="hint">For writing your back cover and translating into rare languages (Tiv, Urhobo, Ijaw…). Free with a daily limit.</p>
+  <label>Claude key (optional, paid)<input id="claudeKey" type="password" placeholder="sk-ant-…"></label>
+  <p class="hint">Only if you prefer Claude. Get one at console.anthropic.com › API keys.</p>
   <label>Pexels key (free)<input id="pexelsKey" type="password"></label>
   <p class="hint">More free cover photos. Get one at pexels.com/api (free sign-up).</p>
   <div class="row end"><button id="settingsCancel">Cancel</button><button class="primary" id="settingsSave">Save</button></div>
@@ -211,7 +215,7 @@
   <table class="plans">
     <tr><th>Starter</th><td>$14 / ₦20,000 a year</td><td>PDF, Kindle and Word files, every KDP size, drop caps</td></tr>
     <tr><th>Writer</th><td>$36 / ₦50,000 a year</td><td>+ cover maker (KDP cover calculator, free pictures)</td></tr>
-    <tr><th>Publisher</th><td>$64 / ₦90,000 a year</td><td>+ translation and Claude writing your back cover</td></tr>
+    <tr><th>Publisher</th><td>$64 / ₦90,000 a year</td><td>+ translation and AI (Gemini or Claude) writing your back cover</td></tr>
     <tr><th>Studio</th><td>$107 / ₦150,000 a year</td><td>+ many languages in one go</td></tr>
   </table>
   <div class="row"><button class="primary" id="buyBtn">Buy or renew a plan</button><span class="hint">Pay by card or bank transfer. Your code comes by email.</span></div>

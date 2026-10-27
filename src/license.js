@@ -23,7 +23,7 @@ const FEATURES = {
   format: 'Making the PDF, Kindle and Word files',
   cover: 'The cover maker',
   translate: 'Translating',
-  ai: 'Claude writing your back cover',
+  ai: 'AI (Gemini or Claude) writing your back cover',
   many: 'Translating into many languages at once',
 };
 // the cheapest plan that has a feature: "Writer"

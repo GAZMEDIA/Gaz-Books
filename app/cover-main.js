@@ -60,9 +60,9 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
     const book = getBook();
     if (!book) throw new Error('Choose your book first (step 1).');
     need('ai');
-    const { claudeKey } = loadSettings();
-    if (!claudeKey) throw new Error('Add your Claude key in Settings to have the back cover written for you. You can also type it yourself.');
-    return writeBackCover(book, { ...o, claudeKey });
+    const { claudeKey, geminiKey } = loadSettings();
+    if (!claudeKey && !geminiKey) throw new Error('Add your free Gemini key in Settings to have the back cover written for you. You can also type it yourself.');
+    return writeBackCover(book, { ...o, claudeKey, geminiKey });
   });
 
   ipcMain.handle('cover-search', async (_e, o) => searchImages({ ...o, pexelsKey: loadSettings().pexelsKey }));

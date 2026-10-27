@@ -16,7 +16,7 @@ const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() {
   try {
     const s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
-    for (const k of ['googleKey', 'claudeKey', 'pexelsKey']) {
+    for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) {
       if (s[k] && s[`${k}Enc`] && safeStorage.isEncryptionAvailable()) s[k] = safeStorage.decryptString(Buffer.from(s[k], 'base64'));
       delete s[`${k}Enc`];
     }
@@ -25,7 +25,7 @@ function loadSettings() {
 }
 function saveSettings(s) {
   const out = { ...s };
-  for (const k of ['googleKey', 'claudeKey', 'pexelsKey']) {
+  for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) {
     if (out[k] && safeStorage.isEncryptionAvailable()) { out[k] = safeStorage.encryptString(out[k]).toString('base64'); out[`${k}Enc`] = true; }
   }
   fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
@@ -115,10 +115,11 @@ ipcMain.handle('build', async (_e, opts) => {
     if (langs.length > 1) need('many');
     jobs.length = 0;
     for (const t of langs) {
-      const tr = { engine: t.engine, target: t.target, language: t.language, source: opts.source || 'en', googleKey: s.googleKey, claudeKey: s.claudeKey };
+      const tr = { engine: t.engine, target: t.target, language: t.language, source: opts.source || 'en', googleKey: s.googleKey, claudeKey: s.claudeKey, geminiKey: s.geminiKey };
       if (tr.engine === 'google' && !s.googleKey) throw new Error('Add your Google Translate key in Settings first, or choose "Google free".');
       if (tr.engine === 'claude' && !s.claudeKey) throw new Error('Add your Claude key in Settings first.');
-      if (tr.engine === 'claude') need('ai');
+      if (tr.engine === 'gemini' && !s.geminiKey) throw new Error('Add your free Gemini key in Settings first (click "Get my free Gemini key").');
+      if (tr.engine === 'claude' || tr.engine === 'gemini') need('ai');
       if (tr.engine === 'offline') {
         tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => win.webContents.send('progress', { step: msg, p: 0 }) });
       }
@@ -151,6 +152,7 @@ const { renderCover } = require('./cover-main')({ getWin: () => win, getBook: ()
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));
+ipcMain.handle('gemini-key-page', () => shell.openExternal(require('../src/gemini').GEMINI_KEY_URL));
 ipcMain.handle('open-link', (_e, url) => { if (/^https:\/\//.test(url)) shell.openExternal(url); });
 
 app.whenReady().then(createWindow);

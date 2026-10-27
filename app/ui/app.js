@@ -92,7 +92,7 @@ $('coverBtn').onclick = async () => {
 $('doTranslate').onchange = () => $('translateBox').classList.toggle('hidden', !$('doTranslate').checked);
 $('engine').onchange = () => {
   const engine = $('engine').value;
-  const claude = engine === 'claude';
+  const claude = engine === 'claude' || engine === 'gemini';
   $('langPick').classList.toggle('hidden', claude);
   $('langType').classList.toggle('hidden', !claude);
   $('langCodeBox').classList.toggle('hidden', !claude);
@@ -104,13 +104,13 @@ $('engine').onchange = () => {
 let moreLangs = [];
 function currentLang() {
   const engine = $('engine').value;
-  if (engine !== 'claude') {
+  if (engine !== 'claude' && engine !== 'gemini') {
     if (!$('lang').value) throw new Error('Choose a language to translate into.');
     return { engine, target: $('lang').value, language: $('lang').selectedOptions[0].text };
   }
   const name = $('langName').value.trim();
   if (!name) throw new Error('Type the language name to translate into.');
-  return { engine: 'claude', target: $('langCode').value.trim() || 'und', language: name };
+  return { engine, target: $('langCode').value.trim() || 'und', language: name };
 }
 function showMoreLangs() {
   $('moreLangs').innerHTML = '';
@@ -137,7 +137,7 @@ $('addLang').onclick = () => {
 const langCache = {};
 async function loadLanguages() {
   const engine = $('engine').value;
-  if (engine === 'claude') return;
+  if (engine === 'claude' || engine === 'gemini') return;
   const sel = $('lang');
   if (engine === 'google' && !settings.googleKey) { sel.innerHTML = '<option value="">Add your Google key in Settings first</option>'; return; }
   sel.innerHTML = '<option value="">Loading languages…</option>';
@@ -160,15 +160,17 @@ async function loadLanguages() {
 
 // Settings
 $('settingsBtn').onclick = () => {
-  for (const k of ['googleKey', 'claudeKey', 'pexelsKey']) $(k).value = settings[k] || '';
+  for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) $(k).value = settings[k] || '';
   $('settings').showModal();
 };
+$('geminiGet').onclick = (e) => { e.preventDefault(); window.gaz.geminiKeyPage(); };
 $('settingsCancel').onclick = () => $('settings').close();
 $('settingsSave').onclick = async () => {
   settings.googleKey = $('googleKey').value.trim();
   settings.claudeKey = $('claudeKey').value.trim();
+  settings.geminiKey = $('geminiKey').value.trim();
   settings.pexelsKey = $('pexelsKey').value.trim();
-  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, pexelsKey: settings.pexelsKey });
+  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, geminiKey: settings.geminiKey, pexelsKey: settings.pexelsKey });
   $('settings').close();
   loadLanguages();
 };

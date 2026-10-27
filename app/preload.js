@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('gaz', {
   coverFetch: (url) => ipcRenderer.invoke('cover-fetch', url),
   coverPickFile: () => ipcRenderer.invoke('cover-pick-file'),
   coverPreview: (o) => ipcRenderer.invoke('cover-preview', o),
+  geminiKeyPage: () => ipcRenderer.invoke('gemini-key-page'),
   coverExport: (o) => ipcRenderer.invoke('cover-export', o),
   onProgress: (fn) => ipcRenderer.on('progress', (_e, d) => fn(d)),
 });

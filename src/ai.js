@@ -17,33 +17,25 @@ function sampleText(book, maxChars = 24000) {
   return out.join('\n');
 }
 
-async function writeBackCover(book, { genre, audience, claudeKey }) {
-  const Anthropic = require('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey: claudeKey });
-  const schema = {
-    type: 'object',
-    properties: {
-      tagline: { type: 'string' },
-      blurb: { type: 'string' },
-      genre: { type: 'string' },
-      mood: { type: 'string' },
-      setting: { type: 'string' },
-      details: { type: 'string' },
-      searchWords: { type: 'array', items: { type: 'string' } },
-    },
-    required: ['tagline', 'blurb', 'genre', 'mood', 'setting', 'details', 'searchWords'],
-    additionalProperties: false,
-  };
-  const response = await client.beta.messages.create({
-    model: 'claude-opus-5-5',
-    max_tokens: 8000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
-    system: 'You write back cover copy for books published on Amazon KDP. Write in the language of the manuscript.',
-    messages: [{
-      role: 'user',
-      content: `Book title: ${book.title || 'Untitled'}\nAuthor: ${book.author || ''}\n${genre ? `Genre: ${genre}\n` : ''}${audience ? `Readers: ${audience}\n` : ''}
+const SCHEMA = {
+  type: 'object',
+  properties: {
+    tagline: { type: 'string' },
+    blurb: { type: 'string' },
+    genre: { type: 'string' },
+    mood: { type: 'string' },
+    setting: { type: 'string' },
+    details: { type: 'string' },
+    searchWords: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['tagline', 'blurb', 'genre', 'mood', 'setting', 'details', 'searchWords'],
+  additionalProperties: false,
+};
+const SYSTEM = 'You write back cover copy for books published on Amazon KDP. Write in the language of the manuscript.';
+
+// Uses Gemini when there is a Gemini key, otherwise Claude.
+async function writeBackCover(book, { genre, audience, claudeKey, geminiKey }) {
+  const prompt = `Book title: ${book.title || 'Untitled'}\nAuthor: ${book.author || ''}\n${genre ? `Genre: ${genre}\n` : ''}${audience ? `Readers: ${audience}\n` : ''}
 Here is the opening of the manuscript:\n<manuscript>\n${sampleText(book)}\n</manuscript>
 
 Write:
@@ -51,8 +43,18 @@ Write:
 - blurb: back cover description, 120 to 170 words, 2 or 3 short paragraphs separated by a blank line. Hook the reader, introduce the main character and the stakes, do not reveal the ending, no reviews or quotes you made up.
 - genre, mood, setting: a few words each, for the cover picture.
 - details: one sentence describing a strong cover picture for this book (objects, place, light, colours). No text in the picture.
-- searchWords: 4 short phrases to search stock photo sites for a fitting cover picture.`,
-    }],
+- searchWords: 4 short phrases to search stock photo sites for a fitting cover picture.`;
+  if (geminiKey) return require('./gemini').geminiJson(geminiKey, { system: SYSTEM, prompt, schema: SCHEMA, maxTokens: 8000 });
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: claudeKey });
+  const response = await client.beta.messages.create({
+    model: 'claude-opus-5-5',
+    max_tokens: 8000,
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
+    system: SYSTEM,
+    messages: [{ role: 'user', content: prompt }],
   });
   if (response.stop_reason === 'refusal') throw new Error('Claude declined to write this back cover.');
   const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');

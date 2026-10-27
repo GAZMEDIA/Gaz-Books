@@ -160,10 +160,24 @@ async function claudeTranslate(texts, language, key) {
   return items;
 }
 
+// ---------------------------------------------------------------- Gemini
+
+async function geminiTranslate(texts, language, key) {
+  const { geminiJson } = require('./gemini');
+  const { items } = await geminiJson(key, {
+    system: `You are a literary translator. Translate each item of the JSON array the user sends into ${language}. Keep the meaning, tone, dialogue style and paragraph boundaries of a published book. Keep any <i> and <b> tags around the matching translated words. Return exactly one translated item for each input item, in the same order.`,
+    prompt: JSON.stringify(texts),
+    schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
+  });
+  if (!Array.isArray(items) || items.length !== texts.length) throw new Error('The translation came back incomplete. Please try again.');
+  return items;
+}
+
 // ---------------------------------------------------------------- main
 
 // One group of texts (HTML with <i>/<b>) through the chosen engine.
-async function translateTexts(texts, { engine, target, language, googleKey, claudeKey, source, offline }) {
+async function translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline }) {
+  if (engine === 'gemini') return geminiTranslate(texts, language || target, geminiKey);
   if (engine === 'claude') return claudeTranslate(texts, language || target, claudeKey);
   if (engine === 'gfree') { const out = await googleFreeTranslate(texts, target, source); await wait(400); return out; }
   if (engine === 'offline') return offline(texts, source || 'en', target);
@@ -183,16 +197,16 @@ async function translateStrings(strings, t) {
 }
 
 // offline: async (texts, source, target) => texts, for the 'offline' engine
-async function translateBook(book, { engine, target, language, googleKey, claudeKey, source, offline }, onProgress = () => {}) {
+async function translateBook(book, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline }, onProgress = () => {}) {
   const copy = JSON.parse(JSON.stringify(book));
   const items = collect(copy);
-  const groups = engine === 'claude' ? batches(items, 12000, 80)
+  const groups = engine === 'claude' || engine === 'gemini' ? batches(items, 12000, 80)
     : engine === 'gfree' ? batches(items, 4000, 40)
       : engine === 'offline' ? batches(items, 2000, 8) : batches(items, 25000, 120);
   let done = 0;
   for (const g of groups) {
     const texts = g.map((it) => (it.plainText ? runsToHtml([{ text: it.get() }]) : it.get()));
-    const out = await translateTexts(texts, { engine, target, language, googleKey, claudeKey, source, offline });
+    const out = await translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline });
     g.forEach((it, i) => it.set(it.plainText ? plain(htmlToRuns(out[i])) : out[i]));
     done += g.length;
     onProgress(done / items.length);
