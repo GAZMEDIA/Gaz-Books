@@ -1,6 +1,6 @@
 {
   "name": "gazbook",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Format books for Amazon KDP: print PDF, Kindle EPUB and Word, with translation.",
   "main": "app/main.js",
   "scripts": {

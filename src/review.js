@@ -213,38 +213,48 @@ ${JSON.stringify(group.map((g) => g.sentence))}`,
 
 // ---------------------------------------------------------------- listing
 
-const LISTING_SCHEMA = {
-  type: 'object',
-  properties: {
-    description: { type: 'string' },
-    aboutBook: { type: 'string' },
-    keywords: { type: 'array', items: { type: 'string' } },
-    categories: { type: 'array', items: { type: 'string' } },
-    coverPrompt: { type: 'string' },
-  },
-  required: ['description', 'aboutBook', 'keywords', 'categories', 'coverPrompt'],
-};
-
+// Two smaller requests (the words, then keywords and categories): short answers
+// are better answers, above all from the built-in AI on the computer.
 async function writeListing(book, keys, language) {
   const name = [book.title, book.subtitle].filter(Boolean).join(': ');
-  return aiJson(keys, {
-    system: 'You are an Amazon KDP marketing expert and copywriter. You follow Amazon KDP metadata rules.',
-    prompt: (big) => `Book: "${name}" by ${book.author || 'the author'}.${language ? ` Write everything in ${language}, for the Amazon store of that language.` : ' Write in the language of the manuscript.'}
+  const intro = (big) => `Book: "${name}" by ${book.author || 'the author'}.${language ? ` Write everything in ${language}, for the Amazon store of that language.` : ' Write in the language of the manuscript.'}
 <manuscript>
 ${sampleText(book, big ? 120000 : 5000)}
 </manuscript>
-
+`;
+  const rules = 'Amazon rules you must follow: do not claim the book is a bestseller or #1, no words like "free", "bestseller", "Kindle Unlimited", "Amazon", "KDP", "new release", "on sale" or "limited time", no other authors\' or books\' names, no misleading categories, no reviews or quotes you made up, no contact details or links.';
+  const system = 'You are an Amazon KDP marketing expert and copywriter. You follow Amazon KDP metadata rules.';
+  const words = await aiJson(keys, {
+    system,
+    prompt: (big) => `${intro(big)}
 Write:
-1. description: an Amazon-optimised book description of about 300 words that opens with a strong emotional hook, speaks directly to the reader's pain points, positions the book as the solution, stresses actionable results rather than passive learning, has bold benefit-driven bullet points, repeats the main keywords of the title and subtitle at least 4 times naturally, keeps a confident and authoritative tone, and ends with a strong call to action. No fluff: every sentence sells clarity, confidence and results. Never repeat the same sentence or phrase. If the book is fiction, keep the same structure but sell the story: the reader's longing for the experience instead of pain points, what they will feel instead of actionable results, and never present a novel as self-help. Format: paragraphs separated by a blank line; bullet lines start with "• "; wrap bold words in **double stars**.
+1. description: an Amazon-optimised book description of about 300 words that opens with a strong emotional hook, speaks directly to the reader's pain points, positions the book as the solution, stresses actionable results rather than passive learning, has 4 to 6 bold benefit-driven bullet points, repeats the main keywords of the title and subtitle at least 4 times naturally, keeps a confident and authoritative tone, and ends with a strong call to action. No fluff: every sentence sells clarity, confidence and results. Never repeat the same sentence or phrase. If the book is fiction, keep the same structure but sell the story: the reader's longing for the experience instead of pain points, what they will feel instead of actionable results, and never present a novel as self-help. Format: paragraphs separated by a blank line; bullet lines start with "• "; wrap bold words in **double stars**.
 2. aboutBook: an "About the Book" section of about 100 words that reinforces credibility, restates the transformation the reader will experience, and matches Amazon's tone and formatting.
-3. keywords: 18 high-impact Amazon search keywords, best first (phrases buyers really type), mixing beginner, problem-based and solution-focused terms. Each at most 50 characters.
-4. categories: 7 Amazon book categories as full paths (e.g. "Books > Religion & Spirituality > Christian Living > Spiritual Growth") that fit the content, have strong traffic and help ranking. Only categories that truly match this book's genre and subject; Amazon removes books from misleading categories.
-5. coverPrompt: ${COVER_PROMPT_TASK(book)}
+3. coverPrompt: ${COVER_PROMPT_TASK(book)}
 
-Amazon rules you must follow: do not claim the book is a bestseller or #1, no words like "free", "bestseller", "Kindle Unlimited", "Amazon", "KDP", "new release", "on sale" or "limited time" in the description or keywords, no other authors' or books' names in keywords, no misleading categories, no reviews or quotes you made up, no contact details or links.`,
-    schema: LISTING_SCHEMA,
-    maxTokens: 16000,
+${rules}`,
+    schema: { type: 'object', properties: { description: { type: 'string' }, aboutBook: { type: 'string' }, coverPrompt: { type: 'string' } }, required: ['description', 'aboutBook', 'coverPrompt'] },
+    maxTokens: 8000,
   });
+  const seo = await aiJson(keys, {
+    system,
+    prompt: (big) => `${intro(big)}
+Amazon SEO for this book:
+A. keywords: 18 different high-impact Amazon search keywords, best first: short phrases (2 to 5 words, at most 50 characters) that buyers really type, mixing beginner, problem-based and solution-focused searches.
+B. categories: 7 different Amazon book categories as full paths, like "Books > Religion & Spirituality > Christian Living > Spiritual Growth", that fit the content, have strong traffic and help ranking. Only categories that truly match this book's genre and subject; Amazon removes books from misleading categories.
+
+${rules}`,
+    schema: {
+      type: 'object',
+      properties: {
+        keywords: { type: 'array', items: { type: 'string' }, minItems: 14, maxItems: 18 },
+        categories: { type: 'array', items: { type: 'string' }, minItems: 7, maxItems: 7 },
+      },
+      required: ['keywords', 'categories'],
+    },
+    maxTokens: 2000,
+  });
+  return { ...words, ...seo };
 }
 
 // ---------------------------------------------------------------- metadata rules
@@ -264,7 +274,9 @@ const BANNED = [
 function checkMetadata(listing, book) {
   const warnings = [];
   const keywords = [];
-  for (const k of listing.keywords || []) {
+  const clean = (list) => [...new Set((list || []).map((x) => String(x).trim()).filter(Boolean))];
+  listing = { ...listing, keywords: clean(listing.keywords), categories: clean(listing.categories) };
+  for (const k of listing.keywords) {
     const bad = BANNED.find(([re]) => re.test(k));
     if (bad) { warnings.push(`Keyword "${k}" was removed: it ${bad[1]}, which Amazon does not allow in keywords.`); continue; }
     if (k.length > 50) { warnings.push(`Keyword "${k}" is longer than 50 characters; KDP will cut it.`); }

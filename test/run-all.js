@@ -82,7 +82,7 @@ require('./mksample');
   const { checkMetadata, fileChecks } = require('../src/review');
   const { makeKitDocx, kitBlocks, descriptionHtml } = require('../src/kit-docx');
   const kws = ['river novel', 'free kindle books', 'bestseller fiction', ...Array.from({ length: 15 }, (_, i) => `keyword ${i}`)];
-  const meta = checkMetadata({ description: 'A **great** read.', keywords: kws, categories: Array(9).fill('Books > Fiction') }, { title: 'The River' });
+  const meta = checkMetadata({ description: 'A **great** read.', keywords: kws, categories: Array.from({ length: 9 }, (_, i) => `Books > Fiction > Kind ${i}`) }, { title: 'The River' });
   assert.strictEqual(meta.listing.keywords.length, 14);
   assert.ok(!meta.listing.keywords.some((k) => /free|bestseller/.test(k)));
   assert.strictEqual(meta.listing.categories.length, 7);

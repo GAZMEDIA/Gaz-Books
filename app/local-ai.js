@@ -53,7 +53,7 @@ function plainSchema(s) {
   if (Array.isArray(s)) return s.map(plainSchema);
   if (!s || typeof s !== 'object') return s;
   const out = {};
-  for (const [k, v] of Object.entries(s)) if (['type', 'properties', 'required', 'items', 'enum'].includes(k)) out[k] = k === 'properties' ? Object.fromEntries(Object.entries(v).map(([p, x]) => [p, plainSchema(x)])) : plainSchema(v);
+  for (const [k, v] of Object.entries(s)) if (['type', 'properties', 'required', 'items', 'enum', 'minItems', 'maxItems'].includes(k)) out[k] = k === 'properties' ? Object.fromEntries(Object.entries(v).map(([p, x]) => [p, plainSchema(x)])) : plainSchema(v);
   if (out.type === 'object' && out.properties && !out.required) out.required = Object.keys(out.properties);
   return out;
 }
@@ -74,7 +74,7 @@ function localJson(dir, { system, prompt, schema, maxTokens = 4000 }, onStatus) 
       const answer = await session.prompt(text, {
         grammar, maxTokens: Math.min(maxTokens, 4000), temperature: 0.4,
         // small models like to loop; this keeps them from repeating a phrase over and over
-        repeatPenalty: { lastTokens: 256, penalty: 1.12, frequencyPenalty: 0.2, presencePenalty: 0.1 },
+        repeatPenalty: { lastTokens: 128, penalty: 1.06 },
       });
       return grammar.parse(answer);
     } finally {
