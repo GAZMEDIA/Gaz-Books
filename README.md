@@ -42,3 +42,21 @@ npm run dist     # Windows installer in dist/ (run on Windows)
 
 Code: `src/` is the engine (read, pdf, epub, docx, translate), `app/` is the
 Electron window. Fonts in `fonts/` are under the SIL Open Font License.
+
+## Plans
+
+GazBook has a 7-day free trial with everything on. After that a yearly plan
+unlocks it (bought at https://gazgoc.com.ng/gazbook/):
+
+| Plan | Price a year | Adds |
+| --- | --- | --- |
+| Starter | ₦20,000 ($14) | PDF, EPUB and Word files |
+| Writer | ₦50,000 ($36) | cover maker |
+| Publisher | ₦90,000 ($64) | translation, Claude back cover |
+| Studio | ₦150,000 ($107) | many languages in one go |
+
+The code comes by email and is checked offline (`src/license.js`) against Gaz
+Media's public key. The GazPresenter Plans WordPress plugin (GAZPRESENTER repo,
+`website/gazpresenter-plans/`) sells the plans and makes the codes; its
+GazPresenter → GazBook admin page gives access by hand and shows the admins'
+unlimited codes.

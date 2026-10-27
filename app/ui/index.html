@@ -10,7 +10,7 @@
 <header>
   <div class="brand"><img class="logo" src="../icon.png" alt=""> GazBook <small>Amazon KDP book formatter</small></div>
   <nav class="tabs"><button class="tab on" data-tab="book">1. Format my book</button><button class="tab" data-tab="cover">2. Make my cover</button></nav>
-  <button class="link" id="settingsBtn">Settings</button>
+  <div class="row"><button class="badge" id="planBtn">…</button><button class="link" id="settingsBtn">Settings</button></div>
 </header>
 
 <main id="tab-book">
@@ -89,6 +89,8 @@
           <input id="langCode" placeholder="e.g. tiv, urh, ijc">
         </label>
       </div>
+      <div class="row"><button id="addLang">+ Add another language</button><span class="hint">Studio plan: make the book in many languages in one go.</span></div>
+      <ul id="moreLangs" class="chips"></ul>
       <p class="hint">Always ask a native speaker to read the translation before you publish it. Machine translation makes mistakes, especially in rare languages.</p>
     </div>
   </section>
@@ -194,6 +196,23 @@
   <label>Pexels key (free)<input id="pexelsKey" type="password"></label>
   <p class="hint">More free cover photos. Get one at pexels.com/api (free sign-up).</p>
   <div class="row end"><button id="settingsCancel">Cancel</button><button class="primary" id="settingsSave">Save</button></div>
+</dialog>
+
+<dialog id="planDlg">
+  <h2>Your GazBook plan</h2>
+  <p id="planNow" class="sizebox"></p>
+  <table class="plans">
+    <tr><th>Starter</th><td>$14 / ₦20,000 a year</td><td>PDF, Kindle and Word files, every KDP size, drop caps</td></tr>
+    <tr><th>Writer</th><td>$36 / ₦50,000 a year</td><td>+ cover maker (KDP cover calculator, free pictures)</td></tr>
+    <tr><th>Publisher</th><td>$64 / ₦90,000 a year</td><td>+ translation and Claude writing your back cover</td></tr>
+    <tr><th>Studio</th><td>$107 / ₦150,000 a year</td><td>+ many languages in one go</td></tr>
+  </table>
+  <div class="row"><button class="primary" id="buyBtn">Buy or renew a plan</button><span class="hint">Pay by card or bank transfer. Your code comes by email.</span></div>
+  <h3>Have a code?</h3>
+  <label>Email you bought it with<input id="licEmail" type="email"></label>
+  <label>Code<textarea id="licCode" rows="2" placeholder="P20271027-…"></textarea></label>
+  <p class="error hidden" id="licError"></p>
+  <div class="row end"><button id="planClose">Close</button><button class="primary" id="licSave">Unlock</button></div>
 </dialog>
 
 <script src="app.js"></script>

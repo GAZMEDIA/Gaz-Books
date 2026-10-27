@@ -6,6 +6,7 @@ const path = require('path');
 const { readBook, buildAll } = require('../src/engine');
 const { googleLanguages } = require('../src/translate');
 const { TRIM_SIZES } = require('../src/kdp');
+const license = require('../src/license');
 
 let win;
 let current = null; // { book, file }
@@ -47,7 +48,23 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
 }
 
+// The free week starts the first time the app opens.
+function licenseNow() {
+  const s = loadSettings();
+  if (!s.firstRun) { s.firstRun = new Date().toISOString().slice(0, 10); saveSettings(s); }
+  return license.licenseState(s);
+}
+const need = (feature) => license.need(licenseNow(), feature);
+
 ipcMain.handle('info', () => ({ version: app.getVersion(), trims: Object.keys(TRIM_SIZES) }));
+ipcMain.handle('license-get', () => ({ ...licenseNow(), email: loadSettings().email || '', buyUrl: license.BUY_URL }));
+ipcMain.handle('license-set', (_e, { email, code }) => {
+  const plan = license.readCode(email, code);
+  if (!plan) throw new Error('That code does not work with this email. Check both, or copy the code again from your email.');
+  if (plan.ends < new Date().toISOString().slice(0, 10)) throw new Error(`That code ended on ${plan.ends}. Buy or renew a plan to get a new one.`);
+  saveSettings({ ...loadSettings(), email: email.trim().toLowerCase(), code: code.trim() });
+  return licenseNow();
+});
 ipcMain.handle('settings-get', () => loadSettings());
 ipcMain.handle('settings-set', (_e, s) => { saveSettings({ ...loadSettings(), ...s }); return true; });
 
@@ -73,26 +90,40 @@ ipcMain.handle('languages', async (_e, key) => googleLanguages(key));
 
 ipcMain.handle('build', async (_e, opts) => {
   if (!current) throw new Error('Choose your book first.');
+  need('format');
   const s = loadSettings();
+  // one build per language; Studio can add more languages to one go
+  const jobs = [opts];
   if (opts.translate) {
-    opts.translate.googleKey = s.googleKey;
-    opts.translate.claudeKey = s.claudeKey;
-    if (opts.translate.engine === 'google' && !s.googleKey) throw new Error('Add your Google Translate key in Settings first.');
-    if (opts.translate.engine === 'claude' && !s.claudeKey) throw new Error('Add your Claude key in Settings first.');
+    const langs = [opts.translate, ...(opts.translate.more || [])];
+    need('translate');
+    if (langs.length > 1) need('many');
+    jobs.length = 0;
+    for (const t of langs) {
+      const tr = { engine: t.engine, target: t.target, language: t.language, googleKey: s.googleKey, claudeKey: s.claudeKey };
+      if (tr.engine === 'google' && !s.googleKey) throw new Error('Add your Google Translate key in Settings first.');
+      if (tr.engine === 'claude' && !s.claudeKey) throw new Error('Add your Claude key in Settings first.');
+      if (tr.engine === 'claude') need('ai');
+      jobs.push({ ...opts, translate: tr });
+    }
   }
-  const result = await buildAll(current.book, opts, (step, p) => win.webContents.send('progress', { step, p }));
+  const results = [];
+  for (const [i, job] of jobs.entries()) {
+    const tag = jobs.length > 1 ? ` ${job.translate.language} (${i + 1} of ${jobs.length})` : '';
+    results.push(await buildAll(current.book, job, (step, p) => win.webContents.send('progress', { step: step + tag, p })));
+  }
   const r = await dialog.showOpenDialog(win, {
-    title: 'Where should I save your 3 book files?', buttonLabel: 'Save here',
+    title: `Where should I save your ${results.length * 3} book files?`, buttonLabel: 'Save here',
     defaultPath: s.lastFolder || app.getPath('documents'), properties: ['openDirectory', 'createDirectory'],
   });
   if (r.canceled || !r.filePaths[0]) return { canceled: true };
   const folder = r.filePaths[0];
-  saveSettings({ ...s, lastFolder: folder });
-  const saved = result.files.map((f) => { const p = path.join(folder, f.name); fs.writeFileSync(p, f.buffer); return { name: f.name, path: p, kind: f.kind }; });
-  return { folder, saved, pageCount: result.pageCount, notes: result.notes };
+  saveSettings({ ...loadSettings(), lastFolder: folder });
+  const saved = results.flatMap((res) => res.files).map((f) => { const p = path.join(folder, f.name); fs.writeFileSync(p, f.buffer); return { name: f.name, path: p, kind: f.kind }; });
+  return { folder, saved, pageCount: results[0].pageCount, notes: [...new Set(results.flatMap((res) => res.notes))] };
 });
 
-require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings });
+require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));

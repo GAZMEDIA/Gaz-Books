@@ -24,7 +24,38 @@ async function init() {
   if (settings.trim) { $('trim').value = settings.trim; $('cTrim').value = settings.trim; }
   if (window.coverInit) window.coverInit();
   loadLanguages();
+  showPlan(await window.gaz.license());
 }
+
+// Plan badge: free trial, plan or locked
+let lic = null;
+function showPlan(l) {
+  lic = l;
+  const b = $('planBtn');
+  b.className = `badge ${l.kind}`;
+  b.textContent = l.kind === 'trial' ? `Free trial: ${l.daysLeft} day${l.daysLeft === 1 ? '' : 's'} left`
+    : l.kind === 'plan' ? `${l.name}${l.forever ? ' (unlimited)' : ''}` : 'Trial ended: buy a plan';
+  $('planNow').textContent = l.kind === 'trial' ? `You are on the free trial: everything works for ${l.daysLeft} more day${l.daysLeft === 1 ? '' : 's'}.`
+    : l.kind === 'plan' ? `${l.name} plan for ${l.email}, ${l.forever ? 'unlimited, no end day' : `until ${l.ends}`}.`
+      : (l.ended ? `Your plan ended on ${l.ended}. Renew it to keep making books.` : 'Your free trial has ended. Pick a plan to keep making books.');
+}
+$('planBtn').onclick = () => {
+  $('licEmail').value = (lic && lic.email) || settings.email || '';
+  $('licCode').value = '';
+  $('licError').classList.add('hidden');
+  $('planDlg').showModal();
+};
+$('planClose').onclick = () => $('planDlg').close();
+$('buyBtn').onclick = () => window.gaz.openLink(`${lic.buyUrl}?email=${encodeURIComponent($('licEmail').value.trim())}`);
+$('licSave').onclick = async () => {
+  try {
+    showPlan(await window.gaz.setLicense({ email: $('licEmail').value, code: $('licCode').value }));
+    $('planDlg').close();
+  } catch (e) {
+    $('licError').textContent = String(e.message).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    $('licError').classList.remove('hidden');
+  }
+};
 
 function showBook(s) {
   $('bookInfo').classList.remove('hidden');
@@ -65,6 +96,38 @@ $('engine').onchange = () => {
   $('langType').classList.toggle('hidden', !claude);
   $('langCodeBox').classList.toggle('hidden', !claude);
 };
+// Studio: more languages in one go
+let moreLangs = [];
+function currentLang() {
+  if ($('engine').value === 'google') {
+    if (!$('lang').value) throw new Error('Choose a language to translate into.');
+    return { engine: 'google', target: $('lang').value, language: $('lang').selectedOptions[0].text };
+  }
+  const name = $('langName').value.trim();
+  if (!name) throw new Error('Type the language name to translate into.');
+  return { engine: 'claude', target: $('langCode').value.trim() || 'und', language: name };
+}
+function showMoreLangs() {
+  $('moreLangs').innerHTML = '';
+  moreLangs.forEach((l, i) => {
+    const li = document.createElement('li');
+    li.textContent = l.language;
+    const x = document.createElement('button'); x.textContent = '×'; x.title = 'Remove';
+    x.onclick = () => { moreLangs.splice(i, 1); showMoreLangs(); };
+    li.append(x);
+    $('moreLangs').append(li);
+  });
+}
+$('addLang').onclick = () => {
+  showError('');
+  try {
+    const l = currentLang();
+    if (!moreLangs.some((m) => m.target === l.target && m.language === l.language)) moreLangs.push(l);
+    showMoreLangs();
+    $('lang').value = ''; $('langName').value = ''; $('langCode').value = '';
+  } catch (e) { showError(e.message); }
+};
+
 async function loadLanguages() {
   if (!settings.googleKey) return;
   try {
@@ -95,7 +158,7 @@ $('settingsSave').onclick = async () => {
 // Make the files
 window.gaz.onProgress(({ step, p }) => {
   $('progressText').textContent = `${step}…`;
-  $('barFill').style.width = `${Math.round((step === 'Translating' ? p * 0.8 : step === 'Done' ? 1 : 0.85) * 100)}%`;
+  $('barFill').style.width = `${Math.round((step.startsWith('Translating') ? p * 0.8 : step.startsWith('Done') ? 1 : 0.85) * 100)}%`;
 });
 
 $('makeBtn').onclick = async () => {
@@ -108,15 +171,12 @@ $('makeBtn').onclick = async () => {
     copyrightExtra: $('copyrightExtra').value.trim(), cover,
   };
   if ($('doTranslate').checked) {
-    const engine = $('engine').value;
-    if (engine === 'google') {
-      if (!$('lang').value) return showError('Choose a language to translate into.');
-      opts.translate = { engine, target: $('lang').value, language: $('lang').selectedOptions[0].text };
-    } else {
-      const name = $('langName').value.trim();
-      if (!name) return showError('Type the language name to translate into.');
-      opts.translate = { engine, target: $('langCode').value.trim() || 'und', language: name };
+    let first;
+    try { first = currentLang(); } catch (e) {
+      if (!moreLangs.length) return showError(e.message);
     }
+    const all = first ? [first, ...moreLangs] : [...moreLangs];
+    opts.translate = { ...all[0], more: all.slice(1) };
   }
   window.gaz.setSettings({ trim: opts.trim, author: opts.author });
   $('makeBtn').disabled = true;
@@ -142,6 +202,7 @@ $('makeBtn').onclick = async () => {
     $('result').classList.remove('hidden');
   } catch (e) {
     showError(e.message);
+    if (/plan badge/.test(e.message)) $('planBtn').click();
   } finally {
     $('makeBtn').disabled = false;
     $('progress').classList.add('hidden');

@@ -56,5 +56,26 @@ require('./mksample');
   assert.deepStrictEqual(found.map((f) => f.id), ['a']);
   assert.ok(found[0].needsCredit);
   console.log('picture search ok');
+
+  // Plan codes: made like the website does (letter, end day, base58 signature).
+  const crypto = require('crypto');
+  const lic = require('../src/license');
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const pub = publicKey.export({ type: 'spki', format: 'pem' });
+  const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const b58 = (buf) => { let n = BigInt(`0x${buf.toString('hex')}`); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; };
+  const make = (email, L, ymd) => `${L}${ymd}-${b58(crypto.sign(null, Buffer.from(`gazbook-plan-v1|${email}|${L}|${ymd}`), privateKey)).match(/.{1,8}/g).join('-')}`;
+  const code = make('jo@example.com', 'W', '20271027');
+  assert.deepStrictEqual(lic.readCode(' Jo@Example.com ', code, pub).features, ['format', 'cover']);
+  assert.strictEqual(lic.readCode('someone@else.com', code, pub), null);
+  assert.strictEqual(lic.readCode('jo@example.com', code.replace('W', 'T'), pub), null);
+  assert.strictEqual(lic.readCode('jo@example.com', make('jo@example.com', 'T', '20991231'), pub).forever, true);
+  const day = Date.parse('2026-10-27T12:00:00Z');
+  assert.strictEqual(lic.licenseState({ firstRun: '2026-10-25' }, day).daysLeft, 5);
+  const locked = lic.licenseState({ firstRun: '2026-10-01' }, day);
+  assert.strictEqual(locked.kind, 'locked');
+  assert.throws(() => lic.need(locked, 'format'), /trial has ended/);
+  assert.throws(() => lic.need({ kind: 'plan', features: ['format'] }, 'cover'), /Writer plan/);
+  console.log('plan codes ok');
   console.log('All good.');
 })().catch((e) => { console.error(e); process.exit(1); });

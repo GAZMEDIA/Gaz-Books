@@ -68,3 +68,14 @@ ol#chapters { columns: 2; margin: 8px 0; }
 dialog { border: 1px solid var(--line); border-radius: 14px; padding: 22px 26px; width: min(520px, 92vw); }
 dialog::backdrop { background: rgba(0, 0, 0, .35); }
 @media (max-width: 760px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+.badge { border-radius: 999px; font-size: 13px; font-weight: 600; padding: 6px 14px; background: #fff6ee; border-color: #f5d2b0; color: #a24d0c; }
+.badge.locked { background: #fdecea; border-color: #f2b8b5; color: var(--err); }
+.badge.plan { background: #eaf5ee; border-color: #b9dcc6; color: var(--ok); }
+.plans { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+.plans th, .plans td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.plans td:nth-child(2) { white-space: nowrap; }
+.chips { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chips li { background: #fff6ee; border: 1px solid #f5d2b0; border-radius: 999px; padding: 3px 6px 3px 12px; font-size: 13px; }
+.chips button { border: 0; background: none; padding: 0 6px; }
+dialog h3 { margin: 18px 0 8px; font-size: 15px; }
+#buyBtn { white-space: nowrap; }

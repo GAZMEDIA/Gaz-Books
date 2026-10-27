@@ -8,7 +8,7 @@ const { coverSize, coverHtml, imagePrompts, printEstimate } = require('../src/co
 const { searchImages } = require('../src/images');
 const { writeBackCover } = require('../src/ai');
 
-module.exports = function coverMain({ getWin, getBook, loadSettings, saveSettings }) {
+module.exports = function coverMain({ getWin, getBook, loadSettings, saveSettings, need = () => {} }) {
   const workDir = () => { const d = path.join(app.getPath('userData'), 'cover'); fs.mkdirSync(d, { recursive: true }); return d; };
 
   // A hidden window that draws HTML. Used for previews, the PDF and picture conversion.
@@ -59,6 +59,7 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
   ipcMain.handle('cover-ai', async (_e, o) => {
     const book = getBook();
     if (!book) throw new Error('Choose your book first (step 1).');
+    need('ai');
     const { claudeKey } = loadSettings();
     if (!claudeKey) throw new Error('Add your Claude key in Settings to have the back cover written for you. You can also type it yourself.');
     return writeBackCover(book, { ...o, claudeKey });
@@ -104,6 +105,7 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
   });
 
   ipcMain.handle('cover-export', async (_e, o) => {
+    need('cover');
     const spec = specFrom({ ...o, guides: false });
     const s = spec.size;
     const html = coverHtml(spec);

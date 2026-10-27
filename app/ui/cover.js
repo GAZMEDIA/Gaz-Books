@@ -5,7 +5,7 @@
     size: null,
   };
   const val = (id) => $(id).value.trim();
-  const err = (msg) => { const e = $('coverError'); e.textContent = msg ? String(msg).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : ''; e.classList.toggle('hidden', !msg); };
+  const err = (msg) => { const e = $('coverError'); e.textContent = msg ? String(msg).replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : ''; e.classList.toggle('hidden', !msg); if (/plan badge/.test(msg || '')) $('planBtn').click(); };
 
   // Tabs
   document.querySelectorAll('.tab').forEach((b) => { b.onclick = () => {
