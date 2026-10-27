@@ -178,7 +178,12 @@ async function geminiTranslate(texts, language, key) {
 async function translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline }) {
   if (engine === 'gemini') return geminiTranslate(texts, language || target, geminiKey);
   if (engine === 'claude') return claudeTranslate(texts, language || target, claudeKey);
-  if (engine === 'gfree') { const out = await googleFreeTranslate(texts, target, source); await wait(400); return out; }
+  if (engine === 'gfree') {
+    try { const out = await googleFreeTranslate(texts, target, source); await wait(400); return out; } catch (e) {
+      if (offline && /fetch failed|ENOTFOUND|ECONN|network|getaddrinfo/i.test(`${e.message} ${e.cause?.code || ''}`)) return offline(texts, source || 'en', target);
+      throw e;
+    }
+  }
   if (engine === 'offline') return offline(texts, source || 'en', target);
   return googleTranslate(texts, target, googleKey, source);
 }

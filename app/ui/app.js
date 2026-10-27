@@ -161,6 +161,7 @@ async function loadLanguages() {
 // Settings
 $('settingsBtn').onclick = () => {
   for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) $(k).value = settings[k] || '';
+  $('localAi').checked = settings.localAi !== false;
   $('settings').showModal();
 };
 $('geminiGet').onclick = (e) => { e.preventDefault(); window.gaz.geminiKeyPage(); };
@@ -170,7 +171,8 @@ $('settingsSave').onclick = async () => {
   settings.claudeKey = $('claudeKey').value.trim();
   settings.geminiKey = $('geminiKey').value.trim();
   settings.pexelsKey = $('pexelsKey').value.trim();
-  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, geminiKey: settings.geminiKey, pexelsKey: settings.pexelsKey });
+  settings.localAi = $('localAi').checked;
+  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, geminiKey: settings.geminiKey, pexelsKey: settings.pexelsKey, localAi: settings.localAi });
   $('settings').close();
   loadLanguages();
 };

@@ -104,7 +104,7 @@
   </section>
 
   <section class="card make">
-    <label class="checks kit"><input type="checkbox" id="kit" checked> <span><b>Make the complete Amazon kit (recommended).</b> Gemini reads the whole book, corrects spelling, grammar and consistency, checks it against Amazon's rules, paints the cover picture, makes the paperback and Kindle covers, and writes the description, About the Book, 14 keywords and 7 categories, for the original book and every translation. Needs your free Gemini key (Settings).</span></label>
+    <label class="checks kit"><input type="checkbox" id="kit" checked> <span><b>Make the complete Amazon kit (recommended).</b> Gemini reads the whole book, corrects spelling, grammar and consistency, checks it against Amazon's rules, paints the cover picture, makes the paperback and Kindle covers, and writes the description, About the Book, 14 keywords and 7 categories, for the original book and every translation. Works online with your free Gemini key, and offline with GazBook's built-in AI.</span></label>
     <button class="primary big" id="makeBtn" disabled>Make my Amazon kit</button>
     <div id="progress" class="hidden"><div class="bar"><div id="barFill"></div></div><p id="progressText"></p></div>
     <p class="error hidden" id="error"></p>
@@ -205,6 +205,7 @@
   <p class="hint">For writing your back cover and translating into rare languages (Tiv, Urhobo, Ijaw…). Free with a daily limit.</p>
   <label>Claude key (optional, paid)<input id="claudeKey" type="password" placeholder="sk-ant-…"></label>
   <p class="hint">Only if you prefer Claude. Get one at console.anthropic.com › API keys.</p>
+  <label class="checks"><input type="checkbox" id="localAi" checked> Use GazBook's built-in AI when there is no internet, or Gemini is busy or not set up (free, no key; downloads once, about 2.5 GB, then works offline)</label>
   <label>Pexels key (free)<input id="pexelsKey" type="password"></label>
   <p class="hint">More free cover photos. Get one at pexels.com/api (free sign-up).</p>
   <div class="row end"><button id="settingsCancel">Cancel</button><button class="primary" id="settingsSave">Save</button></div>

@@ -52,3 +52,11 @@ jobs:
       # The free translator that runs on the computer: download the model and translate a little.
       - name: Check the on-computer translator
         run: node test/offline-translate.js "$env:RUNNER_TEMP\models"
+      # GazBook's built-in AI: download it, write a listing, then check the installed app can run it too.
+      - name: Check the built-in AI
+        run: node test/local-ai.js "$env:RUNNER_TEMP\ai"
+      - name: Check the built-in AI inside the installed app
+        shell: bash
+        env:
+          GAZBOOK_MODEL_DIR: ${{ runner.temp }}\ai
+        run: ./dist/win-unpacked/GazBook.exe --selftest-local-ai

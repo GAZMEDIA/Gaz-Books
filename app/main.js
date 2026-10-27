@@ -91,6 +91,15 @@ ipcMain.handle('pick-cover', async () => {
 ipcMain.handle('languages', async (_e, engine, key) => (engine === 'gfree' ? googleFreeLanguages()
   : engine === 'offline' ? offlineLanguages() : googleLanguages(key)));
 
+// GazBook's built-in AI (on by default): used when Gemini is offline, busy or not set up.
+const localAi = require('./local-ai');
+const modelDir = () => process.env.GAZBOOK_MODEL_DIR || path.join(app.getPath('userData'), 'models', 'ai');
+function aiKeys(s = loadSettings()) {
+  const keys = { geminiKey: s.geminiKey, claudeKey: s.claudeKey };
+  if (s.localAi !== false) keys.local = (o) => localAi.localJson(modelDir(), o, (msg) => win && win.webContents.send('progress', { step: msg, p: 0 }));
+  return keys;
+}
+
 async function translatedCover(spec, b, pages, tr) {
   const [tagline, blurb, bio, subtitle] = await translateStrings([spec.tagline, spec.blurb, spec.bio, spec.subtitle], tr);
   const { pdf, kindle } = await renderCover({ ...spec, title: b.title, subtitle, tagline, blurb, bio, pages });
@@ -123,9 +132,8 @@ ipcMain.handle('build', async (_e, opts) => {
       if (tr.engine === 'claude' && !s.claudeKey) throw new Error('Add your Claude key in Settings first.');
       if (tr.engine === 'gemini' && !s.geminiKey) throw new Error('Add your free Gemini key in Settings first (click "Get my free Gemini key").');
       if (tr.engine === 'claude' || tr.engine === 'gemini') need('ai');
-      if (tr.engine === 'offline') {
-        tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => progress(msg, 0) });
-      }
+      // the on-computer translator; also the backup when Google free can't be reached (offline)
+      tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => progress(msg, 0) });
       langs.push(tr);
       const job = { ...opts, translate: tr };
       // the cover in this language too: same design, translated words, spine fitted to the new page count
@@ -141,8 +149,8 @@ ipcMain.handle('build', async (_e, opts) => {
   if (opts.kit) {
     // the complete Amazon kit: original + every translation, checked, with covers and listing
     need('ai'); need('cover');
-    const keys = { geminiKey: s.geminiKey, claudeKey: s.claudeKey };
-    if (!keys.geminiKey && !keys.claudeKey) throw new Error('The complete Amazon kit needs your free Gemini key. Open Settings and click "Get my free Gemini key".');
+    const keys = aiKeys(s);
+    if (!keys.geminiKey && !keys.claudeKey && !keys.local) throw new Error('The complete Amazon kit needs an AI: add your free Gemini key in Settings, or turn on GazBook\'s built-in AI there.');
     const kit = await makeKit(current.book, opts, langs, { settings: s, keys, progress });
     results = kit.results;
     kitFolder = `${safeName(kit.title)} - Amazon kit`;
@@ -178,7 +186,8 @@ ipcMain.handle('build', async (_e, opts) => {
   return { folder: kitFolder ? path.join(folder, kitFolder) : folder, saved, pageCount: results[0].pageCount, notes: [...new Set(results.flatMap((res) => res.notes))] };
 });
 
-const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
+const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need, aiKeys });
+ipcMain.handle('local-ai-ready', () => localAi.isDownloaded(modelDir()));
 
 const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
 require('../src/ai').setAiCache(path.join(app.getPath('userData'), 'ai-cache'));
@@ -188,5 +197,16 @@ ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));
 ipcMain.handle('gemini-key-page', () => shell.openExternal(require('../src/gemini').GEMINI_KEY_URL));
 ipcMain.handle('open-link', (_e, url) => { if (/^https:\/\//.test(url)) shell.openExternal(url); });
 
-app.whenReady().then(createWindow);
+// CI check of the installed app: gazbook.exe --selftest-local-ai
+if (process.argv.includes('--selftest-local-ai')) {
+  app.whenReady().then(async () => {
+    try {
+      const r = await localAi.localJson(modelDir(), { system: 'You answer in JSON.', prompt: 'Give three Amazon keywords for a book about growing tomatoes.', schema: { type: 'object', properties: { keywords: { type: 'array', items: { type: 'string' } } }, required: ['keywords'] }, maxTokens: 200 }, (m) => console.log(m));
+      console.log('LOCAL AI OK', JSON.stringify(r));
+      app.exit(r.keywords?.length ? 0 : 1);
+    } catch (e) { console.error('LOCAL AI FAILED', e); app.exit(1); }
+  });
+} else {
+  app.whenReady().then(createWindow);
+}
 app.on('window-all-closed', () => app.quit());

@@ -52,22 +52,29 @@ async function pace(ms) {
   lastCall = Date.now();
 }
 
-// One JSON answer from Gemini (when there is a Gemini key) or Claude; if
-// Gemini fails and there is also a Claude key, Claude answers instead.
-// keys: { geminiKey, claudeKey }; think: false for quick, simple jobs like proofreading.
+// One JSON answer. Tries, in order: answers already remembered, Gemini (with
+// a key, online), Claude (with a key), then GazBook's built-in AI on this
+// computer (keys.local), so it also works with no internet.
+// prompt may be a function of how much book text fits: online models read a
+// lot, the built-in AI a short sample.
+// keys: { geminiKey, claudeKey, local }; think: false for quick jobs like proofreading.
 async function aiJson(keys, o) {
-  const file = cacheFile(o);
+  const big = typeof o.prompt === 'function' ? o.prompt(true) : o.prompt;
+  const file = cacheFile({ ...o, prompt: big });
   if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* not asked before */ } }
-  let out;
-  if (keys.geminiKey) {
-    await pace(4000);
-    try {
-      out = await require('./gemini').geminiJson(keys.geminiKey, o);
-    } catch (e) {
-      if (!keys.claudeKey || /declined/.test(e.message)) throw e;
+  const tries = [];
+  if (keys.geminiKey) tries.push(async () => { await pace(4000); return require('./gemini').geminiJson(keys.geminiKey, { ...o, prompt: big }); });
+  if (keys.claudeKey) tries.push(() => claudeJson(keys.claudeKey, { ...o, prompt: big }));
+  if (keys.local) tries.push(() => keys.local({ ...o, prompt: typeof o.prompt === 'function' ? o.prompt(false) : o.prompt }));
+  if (!tries.length) throw new Error('Add your free Gemini key in Settings, or turn on GazBook\'s built-in AI.');
+  let out; let err;
+  for (const t of tries) {
+    try { out = await t(); break; } catch (e) {
+      err = e;
+      if (/declined/.test(e.message)) throw e;
     }
   }
-  if (!out) out = await claudeJson(keys.claudeKey, o);
+  if (!out) throw err;
   if (file) { try { fs.writeFileSync(file, JSON.stringify(out)); } catch { /* the cache is only a help */ } }
   return out;
 }
@@ -91,9 +98,9 @@ async function claudeJson(claudeKey, { system, prompt, schema, maxTokens = 32000
 }
 
 // Back cover words, picture ideas and a cover prompt for AI picture makers.
-async function writeBackCover(book, { genre, audience, claudeKey, geminiKey }) {
-  const prompt = `Book title: ${book.title || 'Untitled'}\n${book.subtitle ? `Subtitle: ${book.subtitle}\n` : ''}Author: ${book.author || ''}\n${genre ? `Genre: ${genre}\n` : ''}${audience ? `Readers: ${audience}\n` : ''}
-Here is the opening of the manuscript:\n<manuscript>\n${sampleText(book)}\n</manuscript>
+async function writeBackCover(book, { genre, audience, claudeKey, geminiKey, local }) {
+  const prompt = (big) => `Book title: ${book.title || 'Untitled'}\n${book.subtitle ? `Subtitle: ${book.subtitle}\n` : ''}Author: ${book.author || ''}\n${genre ? `Genre: ${genre}\n` : ''}${audience ? `Readers: ${audience}\n` : ''}
+Here is the opening of the manuscript:\n<manuscript>\n${sampleText(book, big ? 24000 : 6000)}\n</manuscript>
 
 Write:
 - tagline: one gripping line, at most 15 words.
@@ -102,7 +109,7 @@ Write:
 - details: one sentence describing a strong cover picture for this book (objects, place, light, colours). No text in the picture.
 - searchWords: 4 short phrases to search stock photo sites for a fitting cover picture.
 - coverPrompt: ${COVER_PROMPT_TASK(book)}`;
-  return aiJson({ geminiKey, claudeKey }, { system: SYSTEM, prompt, schema: SCHEMA, maxTokens: 8000 });
+  return aiJson({ geminiKey, claudeKey, local }, { system: SYSTEM, prompt, schema: SCHEMA, maxTokens: 8000 });
 }
 
 // The author's own brief for cover prompts (GazBook owner's wording).
