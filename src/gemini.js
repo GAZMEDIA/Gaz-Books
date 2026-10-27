@@ -16,11 +16,11 @@ function toGeminiSchema(s) {
 
 // One request that answers in JSON matching schema. Retries when Google is busy
 // or the free allowance per minute is used up.
-async function geminiJson(key, { system, prompt, schema, maxTokens = 32000 }) {
+async function geminiJson(key, { system, prompt, schema, maxTokens = 32000, think = true }) {
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(schema), maxOutputTokens: maxTokens, temperature: 0.4 },
+    generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(schema), maxOutputTokens: maxTokens, temperature: 0.4, ...(think ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
   };
   for (let attempt = 0; ; attempt++) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
@@ -42,4 +42,32 @@ async function geminiJson(key, { system, prompt, schema, maxTokens = 32000 }) {
   }
 }
 
-module.exports = { geminiJson, GEMINI_KEY_URL: KEY_URL };
+// A cover picture. Google's picture models need billing turned on in AI Studio
+// (a few US cents a picture); with a free key this fails and the caller falls
+// back to a free stock photo.
+const IMAGE_MODELS = [
+  ['gemini-3-pro-image-preview', { aspectRatio: '2:3', imageSize: '2K' }],
+  ['gemini-2.5-flash-image', { aspectRatio: '2:3' }],
+];
+async function geminiImage(key, prompt) {
+  let last = 'no picture came back';
+  for (const [model, imageConfig] of IMAGE_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig } }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status >= 500 && attempt === 0) { await wait(5000); continue; }
+      if (!r.ok) { last = j.error?.message || `error ${r.status}`; break; }
+      const part = (j.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData?.data);
+      if (part) return { buffer: Buffer.from(part.inlineData.data, 'base64'), mime: part.inlineData.mimeType || 'image/png', model };
+      last = 'Gemini did not return a picture';
+      break;
+    }
+  }
+  throw new Error(last);
+}
+
+module.exports = { geminiJson, geminiImage, GEMINI_KEY_URL: KEY_URL };

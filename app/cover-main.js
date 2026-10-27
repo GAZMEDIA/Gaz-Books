@@ -147,5 +147,5 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
     return { folder, pdfPath, jpgPath, size: s, kindle: `data:image/jpeg;base64,${kindle.toString('base64')}` };
   });
 
-  return { renderCover };
+  return { renderCover, saveAsJpeg };
 };

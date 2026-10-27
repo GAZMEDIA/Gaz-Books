@@ -3,6 +3,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const JSZip = require('jszip');
 const { readBook, buildAll, safeName } = require('../src/engine');
 const { googleLanguages, googleFreeLanguages, translateStrings } = require('../src/translate');
 const { offlineTranslate, offlineLanguages } = require('./offline-main');
@@ -107,22 +108,25 @@ ipcMain.handle('build', async (_e, opts) => {
   if (!current) throw new Error('Choose your book first.');
   need('format');
   const s = loadSettings();
+  const progress = (step, p) => win.webContents.send('progress', { step, p });
   // one build per language; Studio can add more languages to one go
   const jobs = [opts];
+  const langs = [];
   if (opts.translate) {
-    const langs = [opts.translate, ...(opts.translate.more || [])];
+    const wanted = [opts.translate, ...(opts.translate.more || [])];
     need('translate');
-    if (langs.length > 1) need('many');
+    if (wanted.length > 1) need('many');
     jobs.length = 0;
-    for (const t of langs) {
+    for (const t of wanted) {
       const tr = { engine: t.engine, target: t.target, language: t.language, source: opts.source || 'en', googleKey: s.googleKey, claudeKey: s.claudeKey, geminiKey: s.geminiKey };
       if (tr.engine === 'google' && !s.googleKey) throw new Error('Add your Google Translate key in Settings first, or choose "Google free".');
       if (tr.engine === 'claude' && !s.claudeKey) throw new Error('Add your Claude key in Settings first.');
       if (tr.engine === 'gemini' && !s.geminiKey) throw new Error('Add your free Gemini key in Settings first (click "Get my free Gemini key").');
       if (tr.engine === 'claude' || tr.engine === 'gemini') need('ai');
       if (tr.engine === 'offline') {
-        tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => win.webContents.send('progress', { step: msg, p: 0 }) });
+        tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => progress(msg, 0) });
       }
+      langs.push(tr);
       const job = { ...opts, translate: tr };
       // the cover in this language too: same design, translated words, spine fitted to the new page count
       if (opts.coverSpec) {
@@ -132,10 +136,21 @@ ipcMain.handle('build', async (_e, opts) => {
       jobs.push(job);
     }
   }
-  const results = [];
-  for (const [i, job] of jobs.entries()) {
-    const tag = jobs.length > 1 ? ` ${job.translate.language} (${i + 1} of ${jobs.length})` : '';
-    results.push(await buildAll(current.book, job, (step, p) => win.webContents.send('progress', { step: step + tag, p })));
+  let results = [];
+  let kitFolder = '';
+  if (opts.kit) {
+    // the complete Amazon kit: original + every translation, checked, with covers and listing
+    need('ai'); need('cover');
+    const keys = { geminiKey: s.geminiKey, claudeKey: s.claudeKey };
+    if (!keys.geminiKey && !keys.claudeKey) throw new Error('The complete Amazon kit needs your free Gemini key. Open Settings and click "Get my free Gemini key".');
+    const kit = await makeKit(current.book, opts, langs, { settings: s, keys, progress });
+    results = kit.results;
+    kitFolder = `${safeName(kit.title)} - Amazon kit`;
+  } else {
+    for (const [i, job] of jobs.entries()) {
+      const tag = jobs.length > 1 ? ` ${job.translate.language} (${i + 1} of ${jobs.length})` : '';
+      results.push(await buildAll(current.book, job, (step, p) => progress(step + tag, p)));
+    }
   }
   const r = await dialog.showOpenDialog(win, {
     title: `Where should I save your ${results.reduce((n, res) => n + res.files.length, 0)} book files?`, buttonLabel: 'Save here',
@@ -144,11 +159,28 @@ ipcMain.handle('build', async (_e, opts) => {
   if (r.canceled || !r.filePaths[0]) return { canceled: true };
   const folder = r.filePaths[0];
   saveSettings({ ...loadSettings(), lastFolder: folder });
-  const saved = results.flatMap((res) => res.files).map((f) => { const p = path.join(folder, f.name); fs.writeFileSync(p, f.buffer); return { name: f.name, path: p, kind: f.kind }; });
-  return { folder, saved, pageCount: results[0].pageCount, notes: [...new Set(results.flatMap((res) => res.notes))] };
+  const saved = results.flatMap((res) => res.files.map((f) => {
+    const dir = kitFolder ? path.join(folder, kitFolder, safeName(res.folder)) : folder;
+    fs.mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, f.name);
+    fs.writeFileSync(p, f.buffer);
+    return { name: f.name, path: p, kind: f.kind, group: kitFolder ? res.folder : '' };
+  }));
+  if (kitFolder) {
+    // the whole kit in one zip too, with a folder per language
+    progress('Packing everything into one zip file', 1);
+    const zip = new JSZip();
+    for (const res of results) for (const f of res.files) zip.file(`${kitFolder}/${safeName(res.folder)}/${f.name}`, f.buffer);
+    const zipPath = path.join(folder, `${kitFolder}.zip`);
+    fs.writeFileSync(zipPath, await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } }));
+    saved.unshift({ name: path.basename(zipPath), path: zipPath, kind: 'zip', group: '' });
+  }
+  return { folder: kitFolder ? path.join(folder, kitFolder) : folder, saved, pageCount: results[0].pageCount, notes: [...new Set(results.flatMap((res) => res.notes))] };
 });
 
-const { renderCover } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
+const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
+
+const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));

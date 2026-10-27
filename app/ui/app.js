@@ -178,10 +178,12 @@ $('settingsSave').onclick = async () => {
 // Make the files
 window.gaz.onProgress(({ step, p }) => {
   $('progressText').textContent = `${step}…`;
+  if (/^(Translating|Checking)/.test(step)) { $('barFill').style.width = `${Math.round(p * 80)}%`; return; }
   if (step.startsWith('Downloading')) { $('progressText').textContent = step; $('barFill').style.width = `${parseInt(step.split(': ').pop(), 10) || 0}%`; return; }
   $('barFill').style.width = `${Math.round((step.startsWith('Translating') ? p * 0.8 : step.startsWith('Done') ? 1 : 0.85) * 100)}%`;
 });
 
+$('kit').onchange = () => { $('makeBtn').textContent = $('kit').checked ? 'Make my Amazon kit' : 'Make my book files'; };
 $('makeBtn').onclick = async () => {
   showError('');
   const opts = {
@@ -201,6 +203,10 @@ $('makeBtn').onclick = async () => {
     opts.source = $('source').value || 'en';
     if ($('translateCover').checked && window.coverSpec) opts.coverSpec = window.coverSpec();
   }
+  if ($('kit').checked) {
+    opts.kit = true;
+    if (window.coverSpec) opts.coverSpec = window.coverSpec();
+  }
   window.gaz.setSettings({ trim: opts.trim, author: opts.author });
   $('makeBtn').disabled = true;
   $('progress').classList.remove('hidden');
@@ -211,8 +217,14 @@ $('makeBtn').onclick = async () => {
     lastFolder = r.folder;
     $('files').innerHTML = '';
     const label = { pdf: 'Paperback PDF (upload to KDP Paperback)', epub: 'Kindle EPUB (upload to KDP eBook)', docx: 'Word file (to edit or keep)',
-      coverpdf: 'Paperback cover PDF (upload to KDP Paperback › Cover)', coverjpg: 'Kindle cover JPG (upload to KDP eBook › Cover)' };
+      coverpdf: 'Paperback cover PDF (upload to KDP Paperback › Cover)', coverjpg: 'Kindle cover JPG (upload to KDP eBook › Cover)',
+      art: 'Cover picture on its own', kit: 'Marketing kit (description, keywords, categories, checks)', zip: 'Everything in one zip file' };
+    let group = null;
     for (const f of r.saved) {
+      if (f.group && f.group !== group) {
+        group = f.group;
+        const h = document.createElement('li'); h.className = 'group'; h.textContent = group; $('files').append(h);
+      }
       const li = document.createElement('li');
       li.innerHTML = `<span><b></b><br><span class="hint"></span></span>`;
       li.querySelector('b').textContent = label[f.kind];

@@ -54,8 +54,18 @@
       if (r.searchWords?.length) $('q').value = r.searchWords[0];
       $('aiNote').textContent = 'Done. Change anything you like. Picture ideas and search words were filled in too.';
       showSearchIdeas(r.searchWords || []);
+      if (r.coverPrompt) showCoverPrompt(r.coverPrompt);
     } catch (e) { err(e.message); $('aiNote').textContent = ''; } finally { $('aiBtn').disabled = false; }
   };
+  // Gemini's cover prompt, ready to paste into a picture maker
+  function showCoverPrompt(text) {
+    const d = document.createElement('div');
+    d.className = 'prompt';
+    d.innerHTML = '<b><span>Cover prompt written from your book</span><button>Copy</button></b><div></div>';
+    d.querySelector('div').textContent = text;
+    d.querySelector('button').onclick = (e) => { navigator.clipboard.writeText(text); e.target.textContent = 'Copied'; };
+    $('prompts').prepend(d);
+  }
   function showSearchIdeas(words) {
     $('searchNote').innerHTML = '';
     if (!words.length) return;

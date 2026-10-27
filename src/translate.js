@@ -216,4 +216,4 @@ async function translateBook(book, { engine, target, language, googleKey, claude
   return copy;
 }
 
-module.exports = { translateBook, translateStrings, googleLanguages, googleFreeLanguages, googleFreeTranslate, htmlToRuns, runsToHtml, RTL };
+module.exports = { collect, batches, translateBook, translateStrings, googleLanguages, googleFreeLanguages, googleFreeTranslate, htmlToRuns, runsToHtml, RTL };

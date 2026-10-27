@@ -47,6 +47,8 @@ async function readBook(buffer, filename) {
 //       translate: { engine, target, language, googleKey, claudeKey, offline },
 //       makeCover: async (book, pageCount) => ({ kindle (data URL), files }) for a
 //         translated cover; runs after the PDF so the spine fits the real page count
+//       beforeLayout: async (book, onProgress) => book, after translating (checks and corrections)
+//       extraFiles: async (book, { pageCount, pdfMade, files }) => files (listing and checks)
 async function buildAll(book, opts, onProgress = () => {}) {
   let b = JSON.parse(JSON.stringify(book));
   if (opts.title) b.title = opts.title;
@@ -62,6 +64,8 @@ async function buildAll(book, opts, onProgress = () => {}) {
     lang = b.lang; rtl = b.rtl;
   }
 
+  if (opts.beforeLayout) b = await opts.beforeLayout(b, onProgress);
+
   const files = [];
   const base = safeName(b.title) + (opts.translate?.target ? ` (${opts.translate.target})` : '');
 
@@ -71,12 +75,14 @@ async function buildAll(book, opts, onProgress = () => {}) {
   if (cover.missing && family === 'crimson') { family = 'noto'; cover = missingGlyphs(b, 'noto'); }
 
   let pageCount = 200;
+  let pdfMade = false;
   if (rtl || cover.missing > 0) {
     notes.push('The print PDF was skipped: this language uses letters our print fonts do not have yet. The EPUB and Word files are ready, and Word can make a PDF from the .docx (File > Save As > PDF).');
   } else {
     onProgress('Making the print PDF', 0);
     const pdf = await makePdf(b, { ...opts, font: family, lang });
     pageCount = pdf.pageCount;
+    pdfMade = true;
     files.push({ name: `${base} - paperback ${opts.trim || '6x9'}.pdf`, buffer: pdf.buffer, kind: 'pdf' });
     if (pageCount < MIN_PAGES) notes.push(`The paperback is ${pageCount} pages. Amazon needs at least ${MIN_PAGES} pages for a paperback.`);
     if (pageCount > MAX_PAGES) notes.push(`The paperback is ${pageCount} pages. Amazon allows at most ${MAX_PAGES}; try a bigger page size or smaller text.`);
@@ -94,6 +100,7 @@ async function buildAll(book, opts, onProgress = () => {}) {
   files.push({ name: `${base} - Kindle.epub`, buffer: await makeEpub(b, { ...opts, cover: ebookCover, lang, rtl }), kind: 'epub' });
   onProgress('Making the Word file', 0);
   files.push({ name: `${base} - Word.docx`, buffer: await makeDocx(b, { ...opts, lang }, pageCount), kind: 'docx' });
+  if (opts.extraFiles) files.push(...await opts.extraFiles(b, { pageCount, pdfMade, files }));
   onProgress('Done', 1);
   return { files, pageCount, notes, font: family };
 }

@@ -77,5 +77,21 @@ require('./mksample');
   assert.throws(() => lic.need(locked, 'format'), /trial has ended/);
   assert.throws(() => lic.need({ kind: 'plan', features: ['format'] }, 'cover'), /Writer plan/);
   console.log('plan codes ok');
+
+  // Amazon kit: metadata rules, description HTML, the marketing kit Word file
+  const { checkMetadata, fileChecks } = require('../src/review');
+  const { makeKitDocx, kitBlocks, descriptionHtml } = require('../src/kit-docx');
+  const kws = ['river novel', 'free kindle books', 'bestseller fiction', ...Array.from({ length: 15 }, (_, i) => `keyword ${i}`)];
+  const meta = checkMetadata({ description: 'A **great** read.', keywords: kws, categories: Array(9).fill('Books > Fiction') }, { title: 'The River' });
+  assert.strictEqual(meta.listing.keywords.length, 14);
+  assert.ok(!meta.listing.keywords.some((k) => /free|bestseller/.test(k)));
+  assert.strictEqual(meta.listing.categories.length, 7);
+  assert.strictEqual(descriptionHtml('Hook.\n\n• **Fast** results\n• Clear steps\n\nBuy now.'), '<p>Hook.</p><ul><li><b>Fast</b> results</li><li>Clear steps</li></ul><p>Buy now.</p>');
+  const kitDoc = await makeKitDocx(kitBlocks({ book: { title: 'The River', author: 'Ada' }, language: 'German', translated: true, files: [], listing: meta.listing,
+    metaWarnings: meta.warnings, changes: [{ before: 'teh', after: 'the', why: 'typo' }, { before: 'teh', after: 'the', why: 'typo' }],
+    fileChecks: fileChecks({ pageCount: 120, trim: '6x9', pdfMade: true, cover: true }) }));
+  const xml = await (await require('jszip').loadAsync(kitDoc)).file('word/document.xml').async('string');
+  assert.ok(xml.includes('2 times') && xml.includes('native German speaker') && xml.includes('Jesaja 61,3'));
+  console.log('amazon kit ok');
   console.log('All good.');
 })().catch((e) => { console.error(e); process.exit(1); });
