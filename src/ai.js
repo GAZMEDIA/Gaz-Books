@@ -34,10 +34,45 @@ const SCHEMA = {
 };
 const SYSTEM = 'You write back cover copy for books published on Amazon KDP. Write in the language of the manuscript.';
 
-// One JSON answer from Gemini (when there is a Gemini key) or Claude.
+// Finished answers are kept on disk, so pressing the button again after a
+// failure (or a power cut) carries on from where it stopped instead of asking
+// the AI everything again. main sets the folder; tests leave it off.
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+let cacheDir = '';
+function setAiCache(dir) { cacheDir = dir; if (dir) fs.mkdirSync(dir, { recursive: true }); }
+const cacheFile = (o) => cacheDir && path.join(cacheDir, `${crypto.createHash('sha256').update(JSON.stringify([o.system, o.prompt, o.schema])).digest('hex')}.json`);
+
+// The free Gemini allowance counts requests per minute; space them out a little.
+let lastCall = 0;
+async function pace(ms) {
+  const waitFor = lastCall + ms - Date.now();
+  if (waitFor > 0) await new Promise((r) => setTimeout(r, waitFor));
+  lastCall = Date.now();
+}
+
+// One JSON answer from Gemini (when there is a Gemini key) or Claude; if
+// Gemini fails and there is also a Claude key, Claude answers instead.
 // keys: { geminiKey, claudeKey }; think: false for quick, simple jobs like proofreading.
-async function aiJson({ geminiKey, claudeKey }, { system, prompt, schema, maxTokens = 32000, think = true }) {
-  if (geminiKey) return require('./gemini').geminiJson(geminiKey, { system, prompt, schema, maxTokens, think });
+async function aiJson(keys, o) {
+  const file = cacheFile(o);
+  if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* not asked before */ } }
+  let out;
+  if (keys.geminiKey) {
+    await pace(4000);
+    try {
+      out = await require('./gemini').geminiJson(keys.geminiKey, o);
+    } catch (e) {
+      if (!keys.claudeKey || /declined/.test(e.message)) throw e;
+    }
+  }
+  if (!out) out = await claudeJson(keys.claudeKey, o);
+  if (file) { try { fs.writeFileSync(file, JSON.stringify(out)); } catch { /* the cache is only a help */ } }
+  return out;
+}
+
+async function claudeJson(claudeKey, { system, prompt, schema, maxTokens = 32000, think = true }) {
   if (!claudeKey) throw new Error('Add your free Gemini key in Settings first (click "Get my free Gemini key").');
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: claudeKey });
@@ -73,4 +108,4 @@ Write:
 // The author's own brief for cover prompts (GazBook owner's wording).
 const COVER_PROMPT_TASK = (book) => `act as a prompt engineer and write a detailed prompt for an AI picture maker for the cover of the book "${[book.title, book.subtitle].filter(Boolean).join(': ')}" authored by "${book.author || 'the author'}". The cover must be very captivating so it can stand among the best sellers on Amazon KDP. Describe the main image, composition, colours, lighting, mood and style, where the title, subtitle and author name go and their lettering style, and that it must read well as a small thumbnail. Front cover, portrait 1600 x 2560 pixels.`;
 
-module.exports = { writeBackCover, sampleText, aiJson, COVER_PROMPT_TASK };
+module.exports = { writeBackCover, sampleText, aiJson, setAiCache, COVER_PROMPT_TASK };

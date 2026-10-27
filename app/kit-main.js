@@ -54,6 +54,18 @@ async function makePicture({ back, title, trim, keys, settings, saveAsJpeg, stat
   return { path: '', note: `No picture could be made or found${why ? ` (${why})` : ''}, so the cover uses plain colour. You can add a picture in "Make my cover".` };
 }
 
+// A step that needs the AI. If it still fails after the retries, the kit goes
+// on without it and the marketing kit says what to do.
+const problems = [];
+async function tryAI(what, fn, fallback) {
+  try { return await fn(); } catch (e) {
+    if (/key did not work/.test(e.message)) throw e;
+    problems.push(`${what} could not be done this time (${e.message}). Press "Make my Amazon kit" again later: finished parts are remembered, so it carries on from here.`);
+    return fallback;
+  }
+}
+const NO_REVIEW = { language: '', styleSheet: {}, explicitContent: false, explicitDetail: '', issues: [], bibleTranslation: '', scripture: [], missing: true };
+
 module.exports = function kitMain({ renderCover, saveAsJpeg }) {
   async function coverFiles(spec, b, pages, tr, base) {
     let s = { ...spec, title: b.title, subtitle: b.subtitle || '' };
@@ -77,10 +89,13 @@ module.exports = function kitMain({ renderCover, saveAsJpeg }) {
     const status = (step, p = 0) => progress(step, p);
 
     status('Reading your whole book for Amazon\'s checks');
-    const review0 = await reviewBook(book, keys, null);
+    problems.length = 0;
+    const review0 = await tryAI('The Amazon content review', () => reviewBook(book, keys, null), NO_REVIEW);
     const language0 = review0.language || 'Original';
     const fixed0 = await proofreadBook(book, keys, { language: language0, styleSheet: review0.styleSheet, onProgress: (p) => status('Checking spelling, grammar and consistency', p) });
     const book0 = fixed0.book;
+    if (fixed0.backup) problems.push(fixed0.backup);
+    if (fixed0.skipped) problems.push(`${fixed0.skipped} of ${fixed0.total} paragraphs could not be proofread this time (Gemini was busy). Press "Make my Amazon kit" again later to finish them.`);
     const title = opts.title || book0.title; const author = opts.author || book0.author;
     const subtitle = opts.subtitle !== undefined && opts.subtitle !== '' ? opts.subtitle : book0.subtitle;
 
@@ -92,7 +107,8 @@ module.exports = function kitMain({ renderCover, saveAsJpeg }) {
     let back = { tagline: given.tagline, blurb: given.blurb };
     if (!given.blurb || !given.image) {
       status('Writing the back cover');
-      const ai = await writeBackCover({ ...book0, title, author, subtitle }, keys);
+      const ai = await tryAI('Writing the back cover', () => writeBackCover({ ...book0, title, author, subtitle }, keys),
+        { tagline: '', blurb: '', genre: '', mood: '', setting: '', details: '', searchWords: [title].filter(Boolean) });
       if (!given.blurb) back = ai;
       if (!given.image) {
         picture = await makePicture({ back: ai, title, trim: opts.trim, keys, settings, saveAsJpeg, status });
@@ -119,9 +135,11 @@ module.exports = function kitMain({ renderCover, saveAsJpeg }) {
         translate: job.tr || undefined,
         beforeLayout: job.tr ? async (b) => {
           status(`Reading the ${job.language} edition for Amazon's checks`);
-          review = await reviewBook(b, keys, job.language);
-          const r = await proofreadBook(b, keys, { language: job.language, styleSheet: review.styleSheet, onProgress: (p) => status('Checking spelling, grammar and consistency', p) });
+          review = await tryAI(`The ${job.language} content review`, () => reviewBook(b, keys, job.language), NO_REVIEW);
+          const r = await proofreadBook(b, keys, { language: job.language, code: job.tr.target, styleSheet: review.styleSheet, onProgress: (p) => status('Checking spelling, grammar and consistency', p) });
           changes = r.changes;
+          if (r.backup) problems.push(r.backup);
+          if (r.skipped) problems.push(`${r.skipped} of ${r.total} paragraphs of the ${job.language} edition could not be proofread this time (Gemini was busy). Press "Make my Amazon kit" again later to finish them.`);
           return r.book;
         } : undefined,
         makeCover: async (b, pages) => {
@@ -132,8 +150,8 @@ module.exports = function kitMain({ renderCover, saveAsJpeg }) {
         },
         extraFiles: async (b, { pageCount, pdfMade, files }) => {
           status('Writing the Amazon listing');
-          const raw = await writeListing(b, keys, job.language);
-          const { listing, warnings } = checkMetadata(raw, b);
+          const raw = await tryAI(`The ${job.language} Amazon listing`, () => writeListing(b, keys, job.language), null);
+          const { listing, warnings } = raw ? checkMetadata(raw, b) : { listing: null, warnings: null };
           const base = safeName(b.title) + (job.tr ? ` (${job.tr.target})` : '');
           const out = [];
           if (!job.tr && picture?.path) out.push({ name: `${base} - cover picture.jpg`, buffer: require('fs').readFileSync(picture.path), kind: 'art' });
@@ -147,7 +165,7 @@ module.exports = function kitMain({ renderCover, saveAsJpeg }) {
             book: b, language: job.language, translated: !!job.tr,
             files: all.map((f) => ({ name: f.name, label: LABELS[f.kind] || f.kind })),
             listing, metaWarnings: warnings, review, changes, fileChecks: checks, back,
-            picture: picture?.note,
+            picture: picture?.note, problems: [...problems],
           });
           out.push({ name: kitName, buffer: await makeKitDocx(blocks), kind: 'kit' });
           return out;

@@ -163,8 +163,7 @@ async function claudeTranslate(texts, language, key) {
 // ---------------------------------------------------------------- Gemini
 
 async function geminiTranslate(texts, language, key) {
-  const { geminiJson } = require('./gemini');
-  const { items } = await geminiJson(key, {
+  const { items } = await require('./ai').aiJson({ geminiKey: key }, {
     system: `You are a literary translator. Translate each item of the JSON array the user sends into ${language}. Keep the meaning, tone, dialogue style and paragraph boundaries of a published book. Keep any <i> and <b> tags around the matching translated words. Return exactly one translated item for each input item, in the same order.`,
     prompt: JSON.stringify(texts),
     schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },

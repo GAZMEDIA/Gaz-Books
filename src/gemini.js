@@ -25,6 +25,8 @@ async function textModels(key) {
     ...newest(/^gemini-\d+(\.\d+)?-flash$/),
     'gemini-flash-latest',
     ...newest(/^gemini-\d+(\.\d+)?-flash-preview/),
+    ...newest(/^gemini-\d+(\.\d+)?-flash-lite$/),
+    'gemini-flash-lite-latest',
   ])];
 }
 async function imageModels(key) {
@@ -65,10 +67,18 @@ async function geminiJson(key, { system, prompt, schema, maxTokens = 32000, thin
     const msg = j.error?.message || `error ${r.status}`;
     if (!r.ok && gone(r.status, msg) && mi < list.length - 1) { mi++; attempt = -1; continue; }
     if (!r.ok && r.status === 400 && /thinking/i.test(msg) && !think) { think = true; attempt = -1; continue; }
-    if ((r.status === 429 || r.status >= 500) && attempt < 5) { await wait(Math.min(60000, 4000 * 2 ** attempt)); continue; }
+    // Busy ("high demand") or this model's free allowance used up: wait a little,
+    // then try the next model, which has its own capacity and allowance.
+    const busy = r.status >= 500 || /high demand|overloaded|unavailable/i.test(msg);
+    if (busy || r.status === 429) {
+      if (attempt < 2) { await wait(busy ? 3000 * (attempt + 1) : 8000); continue; }
+      if (mi < list.length - 1) { mi++; attempt = -1; continue; }
+      if (attempt < 6) { await wait(Math.min(60000, 5000 * 2 ** (attempt - 2))); mi = 0; continue; }
+    }
     if (!r.ok) {
       if (/API key/i.test(msg)) throw new Error('Your Gemini key did not work. Check it in Settings (get a free one at aistudio.google.com/apikey).');
       if (r.status === 429) throw new Error('Gemini says the free allowance for today is used up. Try again tomorrow, or add billing in Google AI Studio.');
+      if (r.status >= 500 || /high demand|overloaded/i.test(msg)) throw new Error('Google\'s Gemini servers are very busy right now. Please try again in a few minutes.');
       throw new Error(`Gemini: ${msg}`);
     }
     const c = j.candidates?.[0];

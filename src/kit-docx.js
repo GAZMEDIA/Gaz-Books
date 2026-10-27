@@ -59,6 +59,10 @@ function kitBlocks(k) {
   B.push({ h1: `${name} (${k.language})` });
   B.push({ text: `By ${k.book.author || ''}. Everything you need to publish this edition on Amazon KDP.` });
 
+  if (k.problems?.length) {
+    B.push({ h2: 'Not finished this time' });
+    for (const x of k.problems) B.push({ bullet: x });
+  }
   B.push({ h2: 'Files in this folder' });
   for (const f of k.files) B.push({ bullet: `**${f.label}**: ${f.name}` });
 
@@ -96,7 +100,7 @@ function kitBlocks(k) {
     for (const c of list.slice(0, 400)) B.push({ bullet: `“${c.before}” → “${c.after}”${c.why ? ` (${c.why})` : ''}${c.n > 1 ? `, ${c.n} times` : ''}` });
     if (list.length > 400) B.push({ note: `…and ${list.length - 400} more.` });
   }
-  if (k.review) {
+  if (k.review && !k.review.missing) {
     const r = k.review;
     B.push({ text: `**Style kept the same throughout:** ${Object.values(r.styleSheet || {}).filter(Boolean).join('; ')}` });
     B.push({ text: r.explicitContent

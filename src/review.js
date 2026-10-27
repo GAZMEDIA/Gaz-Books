@@ -5,7 +5,8 @@
 const { aiJson, sampleText, COVER_PROMPT_TASK } = require('./ai');
 const { collect, batches } = require('./translate');
 const { plain } = require('./read');
-const { htmlToRuns } = require('./translate');
+const { htmlToRuns, runsToHtml } = require('./translate');
+const { languageToolFix } = require('./languagetool');
 const { MIN_PAGES, MAX_PAGES, gutterFor } = require('./kdp');
 const { coverSize } = require('./cover');
 
@@ -83,15 +84,20 @@ function closeEnough(a, b) {
   return r > 0.75 && r < 1.3;
 }
 
-async function proofreadBook(book, keys, { language, styleSheet, onProgress = () => {} }) {
+async function proofreadBook(book, keys, { language, code, styleSheet, onProgress = () => {} }) {
   const copy = JSON.parse(JSON.stringify(book));
   const items = collect(copy);
-  const groups = batches(items, 14000, 60);
+  // big pieces: fewer requests, so the free allowance lasts and busy moments matter less
+  const groups = batches(items, 30000, 150);
+  let skipped = 0;
+  const missed = [];
   const changes = [];
   let done = 0;
   for (const g of groups) {
     const texts = g.map((it) => it.get());
-    const r = await aiJson(keys, {
+    let r;
+    try {
+    r = await aiJson(keys, {
       system: 'You are a professional copy editor and proofreader for books published on Amazon KDP.',
       prompt: `Proofread each item of this JSON array${language ? ` (${language})` : ''}. Correct only: spelling, grammar, punctuation, typos, doubled words, wrong word forms, and inconsistencies with this style sheet:
 ${styleText(styleSheet)}
@@ -113,6 +119,11 @@ ${JSON.stringify(texts)}`,
       },
       think: false,
     });
+    } catch (e) {
+      // one part failing must not stop the book: keep that part as it was and say so
+      if (/key did not work/.test(e.message)) throw e;
+      skipped += g.length; r = {}; missed.push(...g);
+    }
     if (Array.isArray(r.items) && r.items.length === texts.length) {
       g.forEach((it, i) => {
         if (r.items[i] !== texts[i] && closeEnough(texts[i], r.items[i])) {
@@ -120,11 +131,27 @@ ${JSON.stringify(texts)}`,
         }
       });
       changes.push(...(r.changes || []).filter((c) => c.before !== c.after));
+    } else if (r.items) {
+      skipped += g.length; missed.push(...g);
     }
     done += g.length;
     onProgress(done / items.length);
   }
-  return { book: copy, changes };
+  // Parts Gemini could not do: the free LanguageTool checker corrects their
+  // spelling and grammar instead (no key needed).
+  let backup = '';
+  if (missed.length) {
+    const paras = missed.filter((it) => !it.plainText).map((it) => ({ runs: htmlToRuns(it.get()), set: (runs) => it.set(runsToHtml(runs)) }));
+    try {
+      const lt = await languageToolFix(paras, { code, styleSheet, onProgress });
+      if (!lt.unsupported) {
+        changes.push(...lt.changes.map((c) => ({ ...c, why: `${c.why}, LanguageTool` })));
+        backup = `Gemini was busy for ${skipped} of ${items.length} paragraphs; the free LanguageTool checker corrected their spelling and grammar instead.`;
+        skipped = 0;
+      }
+    } catch { /* LanguageTool unreachable too: those parts stay as they were */ }
+  }
+  return { book: copy, changes, skipped, total: items.length, backup };
 }
 
 // ---------------------------------------------------------------- listing

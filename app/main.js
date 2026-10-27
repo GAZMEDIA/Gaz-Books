@@ -181,6 +181,7 @@ ipcMain.handle('build', async (_e, opts) => {
 const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
 
 const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
+require('../src/ai').setAiCache(path.join(app.getPath('userData'), 'ai-cache'));
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));

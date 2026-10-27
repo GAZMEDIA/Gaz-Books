@@ -12,7 +12,11 @@ const realFetch = globalThis.fetch;
 const calls = {};
 globalThis.fetch = async (url, o = {}) => {
   if (!String(url).includes('generativelanguage.googleapis.com')) return realFetch(url, o);
+  if (String(url).includes('/models?')) return { ok: true, status: 200, json: async () => ({ models: ['gemini-3.8-flash', 'gemini-3.8-flash-lite', 'gemini-3.8-flash-image'].map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ['generateContent'] })) }) };
   const body = JSON.parse(o.body);
+  // Google busy for the first few calls, and the whole time for one model
+  calls.all = (calls.all || 0) + 1;
+  if (calls.all <= 3 || (url.includes('3.8-flash:') && calls.all % 7 === 0)) return { ok: false, status: 503, json: async () => ({ error: { message: 'This model is currently experiencing high demand.' } }) };
   const reply = (obj, status = 200) => ({ ok: status === 200, status, json: async () => obj });
   if (body.generationConfig.responseModalities) { calls.image = (calls.image || 0) + 1; return reply({ error: { message: 'Quota exceeded (free tier has no picture allowance)' } }, 429); }
   const props = Object.keys(body.generationConfig.responseSchema.properties);
