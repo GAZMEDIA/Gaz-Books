@@ -145,6 +145,8 @@
     image: c.image?.path || '', imageMode: $('cMode').value, style: $('cStyle').value,
     bg: $('cBg').value, ink: $('cInk').value, guides,
   });
+  // for translated books: the same cover, filled in again in each language (null when no cover was started)
+  window.coverSpec = () => (val('cTitle') ? spec(false) : null);
   async function preview() {
     err('');
     try { $('previewImg').src = await window.gaz.coverPreview(spec($('cGuides').checked)); } catch (e) { err(e.message); }

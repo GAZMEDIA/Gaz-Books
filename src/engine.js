@@ -44,7 +44,9 @@ async function readBook(buffer, filename) {
 
 // opts: trim, fontSize, dropCaps, rectoChapters, toc, isbn, dedication, copyrightExtra,
 //       cover (data URL), title/author/subtitle overrides, lang,
-//       translate: { engine, target, language, googleKey, claudeKey }
+//       translate: { engine, target, language, googleKey, claudeKey, offline },
+//       makeCover: async (book, pageCount) => ({ kindle (data URL), files }) for a
+//         translated cover; runs after the PDF so the spine fits the real page count
 async function buildAll(book, opts, onProgress = () => {}) {
   let b = JSON.parse(JSON.stringify(book));
   if (opts.title) b.title = opts.title;
@@ -80,12 +82,20 @@ async function buildAll(book, opts, onProgress = () => {}) {
     if (pageCount > MAX_PAGES) notes.push(`The paperback is ${pageCount} pages. Amazon allows at most ${MAX_PAGES}; try a bigger page size or smaller text.`);
   }
 
+  let ebookCover = opts.cover;
+  if (opts.makeCover) {
+    onProgress('Making the cover', 0);
+    const c = await opts.makeCover(b, pageCount);
+    ebookCover = c.kindle || ebookCover;
+    files.push(...c.files);
+  }
+
   onProgress('Making the Kindle EPUB', 0);
-  files.push({ name: `${base} - Kindle.epub`, buffer: await makeEpub(b, { ...opts, lang, rtl }), kind: 'epub' });
+  files.push({ name: `${base} - Kindle.epub`, buffer: await makeEpub(b, { ...opts, cover: ebookCover, lang, rtl }), kind: 'epub' });
   onProgress('Making the Word file', 0);
   files.push({ name: `${base} - Word.docx`, buffer: await makeDocx(b, { ...opts, lang }, pageCount), kind: 'docx' });
   onProgress('Done', 1);
   return { files, pageCount, notes, font: family };
 }
 
-module.exports = { readBook, buildAll };
+module.exports = { readBook, buildAll, safeName };

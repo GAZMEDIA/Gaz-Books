@@ -75,12 +75,17 @@
       <div class="grid2">
         <label>Translator
           <select id="engine">
-            <option value="google">Google Translate (about 250 languages)</option>
+            <option value="gfree">Google free (no key, about 250 languages)</option>
+            <option value="offline">On this computer (free, about 100 languages, works offline)</option>
+            <option value="google">Google with your own key</option>
             <option value="claude">Claude (any other language, type its name)</option>
           </select>
         </label>
         <label id="langPick">Language
-          <select id="lang"><option value="">Add your Google key in Settings first</option></select>
+          <select id="lang"><option value="">Loading languages…</option></select>
+        </label>
+        <label id="sourceBox" class="hidden">My book is written in
+          <select id="source"></select>
         </label>
         <label id="langType" class="hidden">Language name
           <input id="langName" placeholder="e.g. Tiv, Urhobo, Ijaw">
@@ -91,6 +96,8 @@
       </div>
       <div class="row"><button id="addLang">+ Add another language</button><span class="hint">Studio plan: make the book in many languages in one go.</span></div>
       <ul id="moreLangs" class="chips"></ul>
+      <label class="checks"><input type="checkbox" id="translateCover" checked> Also make the front and back cover in each language (uses the cover from "Make my cover")</label>
+      <p class="hint hidden" id="offlineNote">The first time, the free translator downloads once (about 500 MB). After that it works without internet. It keeps the words but not italics or bold.</p>
       <p class="hint">Always ask a native speaker to read the translation before you publish it. Machine translation makes mistakes, especially in rare languages.</p>
     </div>
   </section>

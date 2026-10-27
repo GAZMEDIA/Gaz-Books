@@ -3,8 +3,9 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { readBook, buildAll } = require('../src/engine');
-const { googleLanguages } = require('../src/translate');
+const { readBook, buildAll, safeName } = require('../src/engine');
+const { googleLanguages, googleFreeLanguages, translateStrings } = require('../src/translate');
+const { offlineTranslate, offlineLanguages } = require('./offline-main');
 const { TRIM_SIZES } = require('../src/kdp');
 const license = require('../src/license');
 
@@ -86,7 +87,21 @@ ipcMain.handle('pick-cover', async () => {
   return `data:image/${type};base64,${fs.readFileSync(f).toString('base64')}`;
 });
 
-ipcMain.handle('languages', async (_e, key) => googleLanguages(key));
+ipcMain.handle('languages', async (_e, engine, key) => (engine === 'gfree' ? googleFreeLanguages()
+  : engine === 'offline' ? offlineLanguages() : googleLanguages(key)));
+
+async function translatedCover(spec, b, pages, tr) {
+  const [tagline, blurb, bio, subtitle] = await translateStrings([spec.tagline, spec.blurb, spec.bio, spec.subtitle], tr);
+  const { pdf, kindle } = await renderCover({ ...spec, title: b.title, subtitle, tagline, blurb, bio, pages });
+  const base = `${safeName(b.title)} (${tr.target})`;
+  return {
+    kindle: `data:image/jpeg;base64,${kindle.toString('base64')}`,
+    files: [
+      { name: `${base} - paperback cover ${spec.trim} ${pages}p.pdf`, buffer: pdf, kind: 'coverpdf' },
+      { name: `${base} - Kindle cover.jpg`, buffer: kindle, kind: 'coverjpg' },
+    ],
+  };
+}
 
 ipcMain.handle('build', async (_e, opts) => {
   if (!current) throw new Error('Choose your book first.');
@@ -100,11 +115,20 @@ ipcMain.handle('build', async (_e, opts) => {
     if (langs.length > 1) need('many');
     jobs.length = 0;
     for (const t of langs) {
-      const tr = { engine: t.engine, target: t.target, language: t.language, googleKey: s.googleKey, claudeKey: s.claudeKey };
-      if (tr.engine === 'google' && !s.googleKey) throw new Error('Add your Google Translate key in Settings first.');
+      const tr = { engine: t.engine, target: t.target, language: t.language, source: opts.source || 'en', googleKey: s.googleKey, claudeKey: s.claudeKey };
+      if (tr.engine === 'google' && !s.googleKey) throw new Error('Add your Google Translate key in Settings first, or choose "Google free".');
       if (tr.engine === 'claude' && !s.claudeKey) throw new Error('Add your Claude key in Settings first.');
       if (tr.engine === 'claude') need('ai');
-      jobs.push({ ...opts, translate: tr });
+      if (tr.engine === 'offline') {
+        tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => win.webContents.send('progress', { step: msg, p: 0 }) });
+      }
+      const job = { ...opts, translate: tr };
+      // the cover in this language too: same design, translated words, spine fitted to the new page count
+      if (opts.coverSpec) {
+        need('cover');
+        job.makeCover = (b, pages) => translatedCover(opts.coverSpec, b, pages, tr);
+      }
+      jobs.push(job);
     }
   }
   const results = [];
@@ -113,7 +137,7 @@ ipcMain.handle('build', async (_e, opts) => {
     results.push(await buildAll(current.book, job, (step, p) => win.webContents.send('progress', { step: step + tag, p })));
   }
   const r = await dialog.showOpenDialog(win, {
-    title: `Where should I save your ${results.length * 3} book files?`, buttonLabel: 'Save here',
+    title: `Where should I save your ${results.reduce((n, res) => n + res.files.length, 0)} book files?`, buttonLabel: 'Save here',
     defaultPath: s.lastFolder || app.getPath('documents'), properties: ['openDirectory', 'createDirectory'],
   });
   if (r.canceled || !r.filePaths[0]) return { canceled: true };
@@ -123,7 +147,7 @@ ipcMain.handle('build', async (_e, opts) => {
   return { folder, saved, pageCount: results[0].pageCount, notes: [...new Set(results.flatMap((res) => res.notes))] };
 });
 
-require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
+const { renderCover } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need });
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));

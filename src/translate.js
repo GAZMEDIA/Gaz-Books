@@ -1,6 +1,11 @@
 // Translates a whole book, keeping italic and bold.
-// Two engines:
-//  - Google Translate: about 250 languages, needs a Google Cloud API key.
+// Engines:
+//  - Google free ('gfree'): the free web translator (the one Google's own
+//    pages use), no key, about 250 languages. Google can slow it down or
+//    block it at any time, so it waits between parts and retries.
+//  - On this computer ('offline'): M2M100 (MIT licence) running in the app,
+//    free, about 100 languages; see app/offline-main.js.
+//  - Google Translate ('google'): the paid Cloud API, needs an API key.
 //  - Claude: any language you can name (best for languages Google lacks),
 //    needs an Anthropic API key. Quality drops for very rare languages.
 const { plain } = require('./read');
@@ -82,6 +87,51 @@ async function googleTranslate(texts, target, key, source) {
   }
 }
 
+// ---------------------------------------------------------------- Google free
+
+const GFREE = 'https://translate.googleapis.com/translate_a';
+const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+
+async function googleFreeLanguages() {
+  const r = await fetch(`${GFREE}/l?client=gtx&hl=en`);
+  if (!r.ok) throw new Error(`Could not load the language list (${r.status}). Check the internet connection.`);
+  const j = await r.json();
+  return Object.entries(j.tl || {}).map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function googleFreeOne(text, target, source) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(`${GFREE}/single?client=gtx&dt=t&sl=${encodeURIComponent(source || 'auto')}&tl=${encodeURIComponent(target)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': 'Mozilla/5.0 GazBook' },
+      body: new URLSearchParams({ q: text }).toString(),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      return (j[0] || []).map((seg) => seg[0] || '').join('');
+    }
+    if ((r.status === 429 || r.status >= 500) && attempt < 5) { await wait(3000 * 2 ** attempt); continue; }
+    throw new Error(r.status === 429
+      ? 'Google\'s free translator is busy right now. Wait an hour and try again, or use another translator.'
+      : `Google's free translator failed (${r.status}).`);
+  }
+}
+
+// Paragraphs go together, a blank line between each, and come back the same
+// way. If the count doesn't match, each one is sent on its own.
+async function googleFreeTranslate(texts, target, source) {
+  // it sometimes drops the space before or after <i>…</i>
+  // it also turns &lt; back into <, which would read as a tag
+  const esc = (t) => t.trim().replace(/<(?!\/?(i|b)>)/g, '&lt;');
+  const fix = /^(zh|ja|ko|th|lo|km|my)/.test(target) ? esc
+    : (t) => esc(t).replace(/([^\s(“"'‘])<(i|b)>/g, '$1 <$2>').replace(/<\/(i|b)>([^\s.,;:!?)”"'’…—-])/g, '</$1> $2');
+  const out = (await googleFreeOne(texts.join('\n\n'), target, source)).split(/\n\s*\n/).map(fix);
+  if (out.length === texts.length) return out;
+  const one = [];
+  for (const t of texts) { one.push(fix(await googleFreeOne(t, target, source))); await wait(300); }
+  return one;
+}
+
 // ---------------------------------------------------------------- Claude
 
 async function claudeTranslate(texts, language, key) {
@@ -112,16 +162,37 @@ async function claudeTranslate(texts, language, key) {
 
 // ---------------------------------------------------------------- main
 
-async function translateBook(book, { engine, target, language, googleKey, claudeKey, source }, onProgress = () => {}) {
+// One group of texts (HTML with <i>/<b>) through the chosen engine.
+async function translateTexts(texts, { engine, target, language, googleKey, claudeKey, source, offline }) {
+  if (engine === 'claude') return claudeTranslate(texts, language || target, claudeKey);
+  if (engine === 'gfree') { const out = await googleFreeTranslate(texts, target, source); await wait(400); return out; }
+  if (engine === 'offline') return offline(texts, source || 'en', target);
+  return googleTranslate(texts, target, googleKey, source);
+}
+
+// Plain strings (cover words): lines are translated one by one and put back together.
+async function translateStrings(strings, t) {
+  const lines = []; const where = [];
+  strings.forEach((s, i) => String(s || '').split('\n').forEach((line, j) => { if (line.trim()) { lines.push(runsToHtml([{ text: line }])); where.push([i, j]); } }));
+  const out = strings.map((s) => String(s || '').split('\n'));
+  for (let k = 0; k < lines.length; k += 40) {
+    const got = await translateTexts(lines.slice(k, k + 40), t);
+    got.forEach((h, n) => { const [i, j] = where[k + n]; out[i][j] = plain(htmlToRuns(h)); });
+  }
+  return out.map((l) => l.join('\n'));
+}
+
+// offline: async (texts, source, target) => texts, for the 'offline' engine
+async function translateBook(book, { engine, target, language, googleKey, claudeKey, source, offline }, onProgress = () => {}) {
   const copy = JSON.parse(JSON.stringify(book));
   const items = collect(copy);
-  const groups = engine === 'claude' ? batches(items, 12000, 80) : batches(items, 25000, 120);
+  const groups = engine === 'claude' ? batches(items, 12000, 80)
+    : engine === 'gfree' ? batches(items, 4000, 40)
+      : engine === 'offline' ? batches(items, 2000, 8) : batches(items, 25000, 120);
   let done = 0;
   for (const g of groups) {
     const texts = g.map((it) => (it.plainText ? runsToHtml([{ text: it.get() }]) : it.get()));
-    const out = engine === 'claude'
-      ? await claudeTranslate(texts, language || target, claudeKey)
-      : await googleTranslate(texts, target, googleKey, source);
+    const out = await translateTexts(texts, { engine, target, language, googleKey, claudeKey, source, offline });
     g.forEach((it, i) => it.set(it.plainText ? plain(htmlToRuns(out[i])) : out[i]));
     done += g.length;
     onProgress(done / items.length);
@@ -131,4 +202,4 @@ async function translateBook(book, { engine, target, language, googleKey, claude
   return copy;
 }
 
-module.exports = { translateBook, googleLanguages, RTL };
+module.exports = { translateBook, translateStrings, googleLanguages, googleFreeLanguages, googleFreeTranslate, htmlToRuns, runsToHtml, RTL };

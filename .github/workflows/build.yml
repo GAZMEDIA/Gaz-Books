@@ -49,3 +49,6 @@ jobs:
             --target "${{ github.sha }}" --prerelease \
             --title "GazBook build ${{ github.run_number }} (${GITHUB_REF_NAME})" \
             --notes "Windows installer built from ${GITHUB_REF_NAME} at ${{ github.sha }}."
+      # The free translator that runs on the computer: download the model and translate a little.
+      - name: Check the on-computer translator
+        run: node test/offline-translate.js "$env:RUNNER_TEMP\models"

@@ -91,17 +91,22 @@ $('coverBtn').onclick = async () => {
 // Translation
 $('doTranslate').onchange = () => $('translateBox').classList.toggle('hidden', !$('doTranslate').checked);
 $('engine').onchange = () => {
-  const claude = $('engine').value === 'claude';
+  const engine = $('engine').value;
+  const claude = engine === 'claude';
   $('langPick').classList.toggle('hidden', claude);
   $('langType').classList.toggle('hidden', !claude);
   $('langCodeBox').classList.toggle('hidden', !claude);
+  $('sourceBox').classList.toggle('hidden', engine !== 'offline');
+  $('offlineNote').classList.toggle('hidden', engine !== 'offline');
+  loadLanguages();
 };
 // Studio: more languages in one go
 let moreLangs = [];
 function currentLang() {
-  if ($('engine').value === 'google') {
+  const engine = $('engine').value;
+  if (engine !== 'claude') {
     if (!$('lang').value) throw new Error('Choose a language to translate into.');
-    return { engine: 'google', target: $('lang').value, language: $('lang').selectedOptions[0].text };
+    return { engine, target: $('lang').value, language: $('lang').selectedOptions[0].text };
   }
   const name = $('langName').value.trim();
   if (!name) throw new Error('Type the language name to translate into.');
@@ -128,15 +133,28 @@ $('addLang').onclick = () => {
   } catch (e) { showError(e.message); }
 };
 
+// each translator knows its own list of languages
+const langCache = {};
 async function loadLanguages() {
-  if (!settings.googleKey) return;
+  const engine = $('engine').value;
+  if (engine === 'claude') return;
+  const sel = $('lang');
+  if (engine === 'google' && !settings.googleKey) { sel.innerHTML = '<option value="">Add your Google key in Settings first</option>'; return; }
+  sel.innerHTML = '<option value="">Loading languages…</option>';
   try {
-    const langs = await window.gaz.languages(settings.googleKey);
-    const sel = $('lang');
+    const key = engine === 'google' ? `google:${settings.googleKey}` : engine;
+    const langs = langCache[key] || (langCache[key] = await window.gaz.languages(engine, settings.googleKey));
+    if ($('engine').value !== engine) return;
     sel.innerHTML = '<option value="">Choose a language…</option>';
     for (const l of langs) sel.add(new Option(l.name, l.code));
+    if (engine === 'offline' && !$('source').options.length) {
+      for (const l of langs) $('source').add(new Option(l.name, l.code));
+      $('source').value = 'en';
+    }
   } catch (e) {
-    $('lang').innerHTML = '<option value="">Google key did not work, check Settings</option>';
+    delete langCache[engine];
+    sel.innerHTML = engine === 'google' ? '<option value="">Google key did not work, check Settings</option>'
+      : '<option value="">Could not load languages. Check the internet and pick the translator again.</option>';
   }
 }
 
@@ -158,6 +176,7 @@ $('settingsSave').onclick = async () => {
 // Make the files
 window.gaz.onProgress(({ step, p }) => {
   $('progressText').textContent = `${step}…`;
+  if (step.startsWith('Downloading')) { $('progressText').textContent = step; $('barFill').style.width = `${parseInt(step.split(': ').pop(), 10) || 0}%`; return; }
   $('barFill').style.width = `${Math.round((step.startsWith('Translating') ? p * 0.8 : step.startsWith('Done') ? 1 : 0.85) * 100)}%`;
 });
 
@@ -177,6 +196,8 @@ $('makeBtn').onclick = async () => {
     }
     const all = first ? [first, ...moreLangs] : [...moreLangs];
     opts.translate = { ...all[0], more: all.slice(1) };
+    opts.source = $('source').value || 'en';
+    if ($('translateCover').checked && window.coverSpec) opts.coverSpec = window.coverSpec();
   }
   window.gaz.setSettings({ trim: opts.trim, author: opts.author });
   $('makeBtn').disabled = true;
@@ -187,7 +208,8 @@ $('makeBtn').onclick = async () => {
     if (r.canceled) return;
     lastFolder = r.folder;
     $('files').innerHTML = '';
-    const label = { pdf: 'Paperback PDF (upload to KDP Paperback)', epub: 'Kindle EPUB (upload to KDP eBook)', docx: 'Word file (to edit or keep)' };
+    const label = { pdf: 'Paperback PDF (upload to KDP Paperback)', epub: 'Kindle EPUB (upload to KDP eBook)', docx: 'Word file (to edit or keep)',
+      coverpdf: 'Paperback cover PDF (upload to KDP Paperback › Cover)', coverjpg: 'Kindle cover JPG (upload to KDP eBook › Cover)' };
     for (const f of r.saved) {
       const li = document.createElement('li');
       li.innerHTML = `<span><b></b><br><span class="hint"></span></span>`;

@@ -104,8 +104,8 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
     }, { width: W, height: Math.ceil(cssH * z) });
   });
 
-  ipcMain.handle('cover-export', async (_e, o) => {
-    need('cover');
+  // The print PDF (exact size) and the Kindle front cover JPG for a cover spec.
+  async function renderCover(o) {
     const spec = specFrom({ ...o, guides: false });
     const s = spec.size;
     const html = coverHtml(spec);
@@ -124,6 +124,12 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
       const shot = await w.webContents.capturePage({ x: Math.round(s.front.x * 96 * z), y: Math.round(s.bleed * 96 * z), width: kW, height: Math.round(s.trimH * 96 * z) });
       return shot.toJPEG(92);
     }, { width: 1200, height: 900 });
+    return { pdf, kindle, size: s };
+  }
+
+  ipcMain.handle('cover-export', async (_e, o) => {
+    need('cover');
+    const { pdf, kindle, size: s } = await renderCover(o);
 
     const settings = loadSettings();
     const r = await dialog.showOpenDialog(getWin(), {
@@ -140,4 +146,6 @@ module.exports = function coverMain({ getWin, getBook, loadSettings, saveSetting
     fs.writeFileSync(jpgPath, kindle);
     return { folder, pdfPath, jpgPath, size: s, kindle: `data:image/jpeg;base64,${kindle.toString('base64')}` };
   });
+
+  return { renderCover };
 };

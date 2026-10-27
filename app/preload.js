@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('gaz', {
   pickBook: () => ipcRenderer.invoke('pick-book'),
   openDropped: (file) => ipcRenderer.invoke('open-book-path', webUtils.getPathForFile(file)),
   pickCover: () => ipcRenderer.invoke('pick-cover'),
-  languages: (key) => ipcRenderer.invoke('languages', key),
+  languages: (engine, key) => ipcRenderer.invoke('languages', engine, key),
   build: (opts) => ipcRenderer.invoke('build', opts),
   openPath: (p) => ipcRenderer.invoke('open-path', p),
   showInFolder: (p) => ipcRenderer.invoke('show-in-folder', p),
