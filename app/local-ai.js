@@ -71,7 +71,11 @@ function localJson(dir, { system, prompt, schema, maxTokens = 4000 }, onStatus) 
       // keep the prompt inside the context, leaving room for the answer
       const room = Math.floor((CONTEXT - Math.min(maxTokens, 4000) - 300) * 2.5);
       const text = prompt.length > room ? `${prompt.slice(0, room - 2000)}\n…\n${prompt.slice(-2000)}` : prompt;
-      const answer = await session.prompt(text, { grammar, maxTokens: Math.min(maxTokens, 4000), temperature: 0.4 });
+      const answer = await session.prompt(text, {
+        grammar, maxTokens: Math.min(maxTokens, 4000), temperature: 0.4,
+        // small models like to loop; this keeps them from repeating a phrase over and over
+        repeatPenalty: { lastTokens: 256, penalty: 1.12, frequencyPenalty: 0.2, presencePenalty: 0.1 },
+      });
       return grammar.parse(answer);
     } finally {
       sequence.dispose();
