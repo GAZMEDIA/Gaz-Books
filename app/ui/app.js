@@ -16,9 +16,13 @@ function showError(msg) {
 
 async function init() {
   const info = await window.gaz.info();
-  for (const t of info.trims) $('trim').add(new Option(TRIM_NAMES[t] || t, t, t === '6x9', t === '6x9'));
+  for (const t of info.trims) {
+    $('trim').add(new Option(TRIM_NAMES[t] || t, t, t === '6x9', t === '6x9'));
+    $('cTrim').add(new Option(TRIM_NAMES[t] || t, t, t === '6x9', t === '6x9'));
+  }
   settings = await window.gaz.getSettings();
-  if (settings.trim) $('trim').value = settings.trim;
+  if (settings.trim) { $('trim').value = settings.trim; $('cTrim').value = settings.trim; }
+  if (window.coverInit) window.coverInit();
   loadLanguages();
 }
 
@@ -33,6 +37,7 @@ function showBook(s) {
   for (const c of s.chapters) { const li = document.createElement('li'); li.textContent = c; $('chapters').append(li); }
   $('makeBtn').disabled = false;
   $('result').classList.add('hidden');
+  if (window.coverBookChanged) window.coverBookChanged(s);
 }
 
 async function open(fn) {
@@ -73,12 +78,16 @@ async function loadLanguages() {
 }
 
 // Settings
-$('settingsBtn').onclick = () => { $('googleKey').value = settings.googleKey || ''; $('claudeKey').value = settings.claudeKey || ''; $('settings').showModal(); };
+$('settingsBtn').onclick = () => {
+  for (const k of ['googleKey', 'claudeKey', 'pexelsKey']) $(k).value = settings[k] || '';
+  $('settings').showModal();
+};
 $('settingsCancel').onclick = () => $('settings').close();
 $('settingsSave').onclick = async () => {
   settings.googleKey = $('googleKey').value.trim();
   settings.claudeKey = $('claudeKey').value.trim();
-  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey });
+  settings.pexelsKey = $('pexelsKey').value.trim();
+  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, pexelsKey: settings.pexelsKey });
   $('settings').close();
   loadLanguages();
 };
@@ -128,6 +137,7 @@ $('makeBtn').onclick = async () => {
       li.append(b);
       $('files').append(li);
     }
+    if (r.pageCount && window.coverPagesKnown) window.coverPagesKnown(r.pageCount, opts.trim);
     $('notes').textContent = [r.pageCount ? `Paperback: ${r.pageCount} pages.` : '', ...r.notes].filter(Boolean).join(' ');
     $('result').classList.remove('hidden');
   } catch (e) {

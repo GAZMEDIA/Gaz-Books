@@ -31,5 +31,30 @@ require('./mksample');
       console.log(`${ext} -> ${trim}: ${b.pageCount} pages`);
     }
   }
+  // Cover maths: same as Amazon's cover calculator.
+  const { coverSize, printEstimate } = require('../src/cover');
+  const c = coverSize({ trim: '6x9', pages: 240, paper: 'white' });
+  assert.strictEqual(c.spine, 0.54);
+  assert.strictEqual(c.width, 12.79);
+  assert.strictEqual(c.height, 9.25);
+  assert.strictEqual(coverSize({ trim: '5x8', pages: 300, paper: 'cream' }).width, 11);
+  assert.strictEqual(coverSize({ trim: '6x9', pages: 60 }).spineText, false);
+  assert.strictEqual(printEstimate({ trim: '6x9', pages: 240 }).printCost, 3.88);
+  console.log('cover sizes ok');
+
+  // Picture search, with a pretend Openverse.
+  const realFetch = global.fetch;
+  global.fetch = async (url) => ({
+    ok: true, json: async () => ({ results: [
+      { id: 'a', url: 'https://x/a.jpg', thumbnail: 'https://x/a-t.jpg', width: 5000, height: 3500, creator: 'Ada', license: 'by', license_version: '4.0', foreign_landing_url: 'https://x/a' },
+      { id: 'b', url: 'https://x/b.jpg', width: 800, height: 600, license: 'cc0' },
+    ] }),
+  });
+  const { searchImages } = require('../src/images');
+  const found = await searchImages({ query: 'river', orientation: 'landscape', minPx: c.px });
+  global.fetch = realFetch;
+  assert.deepStrictEqual(found.map((f) => f.id), ['a']);
+  assert.ok(found[0].needsCredit);
+  console.log('picture search ok');
   console.log('All good.');
 })().catch((e) => { console.error(e); process.exit(1); });

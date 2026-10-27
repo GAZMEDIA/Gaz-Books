@@ -14,7 +14,7 @@ const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() {
   try {
     const s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
-    for (const k of ['googleKey', 'claudeKey']) {
+    for (const k of ['googleKey', 'claudeKey', 'pexelsKey']) {
       if (s[k] && s[`${k}Enc`] && safeStorage.isEncryptionAvailable()) s[k] = safeStorage.decryptString(Buffer.from(s[k], 'base64'));
       delete s[`${k}Enc`];
     }
@@ -23,7 +23,7 @@ function loadSettings() {
 }
 function saveSettings(s) {
   const out = { ...s };
-  for (const k of ['googleKey', 'claudeKey']) {
+  for (const k of ['googleKey', 'claudeKey', 'pexelsKey']) {
     if (out[k] && safeStorage.isEncryptionAvailable()) { out[k] = safeStorage.encryptString(out[k]).toString('base64'); out[`${k}Enc`] = true; }
   }
   fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
@@ -91,6 +91,8 @@ ipcMain.handle('build', async (_e, opts) => {
   const saved = result.files.map((f) => { const p = path.join(folder, f.name); fs.writeFileSync(p, f.buffer); return { name: f.name, path: p, kind: f.kind }; });
   return { folder, saved, pageCount: result.pageCount, notes: result.notes };
 });
+
+require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings });
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));
 ipcMain.handle('show-in-folder', (_e, p) => shell.showItemInFolder(p));

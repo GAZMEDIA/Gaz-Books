@@ -19,6 +19,14 @@ Cloud key) or Claude (any language you can name, needs an Anthropic key).
 Print PDFs are made for Latin, Greek and Cyrillic scripts; for other scripts the
 app makes the EPUB and Word files and says so.
 
+**Cover maker** (tab 2): works out the full paperback cover size the same way
+as Amazon's cover calculator (trim + spine from page count and paper + 0.125"
+bleed), estimates the US print cost and royalty, writes the back cover blurb
+and tagline from the manuscript (Claude), makes prompts for AI picture makers,
+searches free pictures that allow commercial use (Openverse, plus Pexels with a
+free key) and keeps only ones big enough for 300 DPI, then saves a print-ready
+cover PDF (front, spine, back, barcode space) and a Kindle cover JPG.
+
 ## Install
 
 Download `GazBook-Setup-x.y.z.exe` from the latest release and run it.

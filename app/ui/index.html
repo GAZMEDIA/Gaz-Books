@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'">
 <title>GazBook</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-  <div class="brand"><span class="logo">G</span> GazBook <small>Amazon KDP book formatter</small></div>
+  <div class="brand"><img class="logo" src="../icon.png" alt=""> GazBook <small>Amazon KDP book formatter</small></div>
+  <nav class="tabs"><button class="tab on" data-tab="book">1. Format my book</button><button class="tab" data-tab="cover">2. Make my cover</button></nav>
   <button class="link" id="settingsBtn">Settings</button>
 </header>
 
-<main>
+<main id="tab-book">
   <!-- Step 1 -->
   <section class="card" id="step1">
     <h2><span class="num">1</span> Choose your book</h2>
@@ -105,16 +106,97 @@
   </section>
 </main>
 
+
+<main id="tab-cover" class="hidden">
+  <section class="card">
+    <h2><span class="num">A</span> Cover size (Amazon KDP)</h2>
+    <div class="grid3">
+      <label>Page size<select id="cTrim"></select></label>
+      <label>Number of pages<input id="cPages" type="number" min="24" max="828" value="200"></label>
+      <label>Paper and ink<select id="cPaper">
+        <option value="white">Black ink, white paper</option><option value="cream">Black ink, cream paper</option>
+        <option value="color-standard">Standard colour, white paper</option><option value="color-premium">Premium colour, white paper</option>
+      </select></label>
+    </div>
+    <div class="sizebox" id="sizeBox"></div>
+    <p class="hint">Same sums as Amazon's cover calculator. To double-check, open <a href="#" id="kdpCalc">Amazon's cover calculator</a> and enter the same page size, pages and paper.</p>
+    <div class="grid3">
+      <label>Your price in US dollars (optional)<input id="cPrice" type="number" step="0.01" min="0" placeholder="12.99"></label>
+      <div class="est" id="estBox"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">B</span> Words on the cover</h2>
+    <div class="grid3">
+      <label>Title<input id="cTitle"></label>
+      <label>Subtitle<input id="cSubtitle"></label>
+      <label>Author<input id="cAuthor"></label>
+    </div>
+    <div class="row"><button class="primary" id="aiBtn">✨ Write the back cover for me</button><span class="hint" id="aiNote">Uses Claude (add your key in Settings). Reads the start of your book.</span></div>
+    <label>Tagline (one strong line)<input id="cTagline" placeholder="One river. One night. Every secret rising."></label>
+    <label>Back cover description<textarea id="cBlurb" rows="6"></textarea></label>
+    <label>About the author (optional)<textarea id="cBio" rows="2"></textarea></label>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">C</span> Cover picture</h2>
+    <div class="subtabs"><button class="st on" data-st="search">Search free pictures online</button><button class="st" data-st="own">Use my own picture</button><button class="st" data-st="prompts">Picture prompts (for AI picture makers)</button></div>
+    <div id="st-search">
+      <div class="row"><input id="q" placeholder="e.g. river sunset Africa"><select id="orient"><option value="landscape">Whole cover (wide)</option><option value="portrait">Front only (tall)</option></select><button class="primary" id="searchBtn">Search</button></div>
+      <p class="hint" id="searchNote">Only pictures you may use on a book you sell, big enough to print sharply. Free Pexels key in Settings adds more photos.</p>
+      <div class="results" id="results"></div>
+    </div>
+    <div id="st-own" class="hidden">
+      <button id="ownBtn">Choose picture…</button>
+      <p class="hint">Use a picture you made or bought. For a sharp print it should be at least the pixel size shown in step A.</p>
+    </div>
+    <div id="st-prompts" class="hidden">
+      <div class="grid2">
+        <label>Kind of book<input id="pGenre" placeholder="thriller, romance, memoir…"></label>
+        <label>Feeling<input id="pMood" placeholder="dark and tense, warm, hopeful…"></label>
+        <label>Place<input id="pSetting" placeholder="a flooded market town in Nigeria"></label>
+        <label>What should be in the picture<input id="pDetails" placeholder="a girl on a rooftop at dawn, red sky"></label>
+      </div>
+      <button id="promptBtn">Make prompts</button>
+      <div id="prompts"></div>
+      <p class="hint">Paste a prompt into any AI picture maker (for example ChatGPT, Gemini or Midjourney), download the picture, then use "Use my own picture".</p>
+    </div>
+    <div class="chosen hidden" id="chosen"><img id="chosenImg" alt=""><div><b id="chosenInfo"></b><p class="hint" id="chosenCredit"></p></div></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">D</span> Look and save</h2>
+    <div class="grid3">
+      <label>Picture covers<select id="cMode"><option value="wrap">The whole cover</option><option value="front">Only the front</option></select></label>
+      <label>Style<select id="cStyle"><option value="classic">Classic</option><option value="modern">Modern (bold capitals)</option><option value="elegant">Elegant</option></select></label>
+      <label>Colours<span class="row"><input type="color" id="cBg" value="#1d2433" title="Background"><input type="color" id="cInk" value="#ffffff" title="Writing"></span></label>
+    </div>
+    <label class="checks"><input type="checkbox" id="cGuides" checked> Show the cutting and safe lines in the preview (they are never printed)</label>
+    <div class="row"><button id="previewBtn">Update preview</button><button class="primary" id="saveCoverBtn">Save my cover</button></div>
+    <p class="error hidden" id="coverError"></p>
+    <div class="preview"><img id="previewImg" alt=""></div>
+    <div id="coverResult" class="hidden">
+      <p class="ok">Cover saved.</p>
+      <ul id="coverFiles"></ul>
+      <p class="hint">The Kindle cover is also added to your ebook the next time you click "Make my 3 book files".</p>
+    </div>
+  </section>
+</main>
+
 <dialog id="settings">
   <h2>Settings</h2>
   <p class="hint">Keys are only needed for translating. They are stored on this computer, locked to your Windows account.</p>
   <label>Google Translate key<input id="googleKey" type="password" placeholder="AIza…"></label>
   <p class="hint">Get one: Google Cloud Console › APIs &amp; Services › Enable “Cloud Translation API” › Credentials › Create API key. About $20 per million letters (a 300-page novel is about $10 per language).</p>
   <label>Claude key<input id="claudeKey" type="password" placeholder="sk-ant-…"></label>
-  <p class="hint">Get one at console.anthropic.com › API keys.</p>
+  <p class="hint">For translating and writing back covers. Get one at console.anthropic.com › API keys.</p>
+  <label>Pexels key (free)<input id="pexelsKey" type="password"></label>
+  <p class="hint">More free cover photos. Get one at pexels.com/api (free sign-up).</p>
   <div class="row end"><button id="settingsCancel">Cancel</button><button class="primary" id="settingsSave">Save</button></div>
 </dialog>
 
 <script src="app.js"></script>
+<script src="cover.js"></script>
 </body>
 </html>
