@@ -96,7 +96,7 @@ const localAi = require('./local-ai');
 const modelDir = () => process.env.GAZBOOK_MODEL_DIR || path.join(app.getPath('userData'), 'models', 'ai');
 function aiKeys(s = loadSettings()) {
   const keys = { geminiKey: s.geminiKey, claudeKey: s.claudeKey };
-  if (s.localAi !== false) keys.local = (o) => localAi.localJson(modelDir(), o, (msg) => win && win.webContents.send('progress', { step: msg, p: 0 }), s.aiSize || 'small');
+  if (s.localAi !== false) keys.local = (o) => localAi.localJson(modelDir(), o, (msg) => win && win.webContents.send('progress', { step: msg, p: 0 }));
   return keys;
 }
 
@@ -188,48 +188,6 @@ ipcMain.handle('build', async (_e, opts) => {
 
 const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need, aiKeys });
 ipcMain.handle('local-ai-ready', () => localAi.isDownloaded(modelDir()));
-
-// The AI pack: both offline AIs (writing + translating, about 3 GB) in one
-// folder, to fetch once on good internet and copy to other computers by USB.
-const modelsRoot = () => path.join(app.getPath('userData'), 'models');
-const packStatus = () => ({
-  ai: localAi.isDownloaded(modelDir()),
-  translator: fs.existsSync(path.join(modelsRoot(), 'Xenova', 'm2m100_418M')),
-});
-const packNote = (text) => win && win.webContents.send('ai-pack-progress', text);
-ipcMain.handle('ai-pack-status', () => packStatus());
-ipcMain.handle('ai-pack-download', async () => {
-  await localAi.load(modelDir(), packNote, loadSettings().aiSize || 'small');
-  packNote('Getting the free translator…');
-  await offlineTranslate(['Hello.'], 'en', 'fr', { cacheDir: modelsRoot(), onStatus: packNote });
-  packNote('');
-  return packStatus();
-});
-ipcMain.handle('ai-pack-save', async () => {
-  const st = packStatus();
-  if (!st.ai && !st.translator) throw new Error('There is nothing to save yet. Click "Download AI now" first.');
-  const r = await dialog.showOpenDialog(win, { title: 'Where should I save the AI pack? (a USB stick works)', buttonLabel: 'Save here', properties: ['openDirectory', 'createDirectory'] });
-  if (r.canceled || !r.filePaths[0]) return null;
-  const dest = path.join(r.filePaths[0], 'GazBook AI pack');
-  packNote('Copying the AI pack…');
-  await fs.promises.cp(modelsRoot(), path.join(dest, 'models'), { recursive: true, force: true });
-  fs.writeFileSync(path.join(dest, 'READ ME.txt'), 'GazBook AI pack\r\n\r\nOn another computer: open GazBook, click Settings, click "Install AI pack…" and choose this "GazBook AI pack" folder.\r\nNo internet is needed.\r\n');
-  packNote('');
-  return dest;
-});
-ipcMain.handle('ai-pack-install', async () => {
-  const r = await dialog.showOpenDialog(win, { title: 'Choose the "GazBook AI pack" folder', buttonLabel: 'Install', properties: ['openDirectory'] });
-  if (r.canceled || !r.filePaths[0]) return null;
-  let src = r.filePaths[0];
-  for (const c of [path.join(src, 'models'), path.join(src, 'GazBook AI pack', 'models')]) if (fs.existsSync(c)) { src = c; break; }
-  const hasAi = fs.existsSync(path.join(src, 'ai')) && localAi.isDownloaded(path.join(src, 'ai'));
-  const hasTr = fs.existsSync(path.join(src, 'Xenova'));
-  if (!hasAi && !hasTr) throw new Error('That folder is not a GazBook AI pack. Choose the folder called "GazBook AI pack".');
-  packNote('Installing the AI pack…');
-  await fs.promises.cp(src, modelsRoot(), { recursive: true, force: true });
-  packNote('');
-  return packStatus();
-});
 
 const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
 require('../src/ai').setAiCache(path.join(app.getPath('userData'), 'ai-cache'));
