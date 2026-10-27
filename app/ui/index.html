@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>GazBook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">G</span> GazBook <small>Amazon KDP book formatter</small></div>
+  <button class="link" id="settingsBtn">Settings</button>
+</header>
+
+<main>
+  <!-- Step 1 -->
+  <section class="card" id="step1">
+    <h2><span class="num">1</span> Choose your book</h2>
+    <div class="drop" id="drop">
+      <p><b>Drag your book here</b> or</p>
+      <button class="primary" id="pickBtn">Choose file…</button>
+      <p class="hint">Word (.docx), PDF, or text. From Google Docs: <b>File › Download › Microsoft Word (.docx)</b>.</p>
+    </div>
+    <div id="bookInfo" class="hidden">
+      <p class="ok" id="bookFile"></p>
+      <div class="grid2">
+        <label>Book title<input id="title"></label>
+        <label>Author name<input id="author"></label>
+        <label>Subtitle (optional)<input id="subtitle"></label>
+        <label>ISBN (optional)<input id="isbn" placeholder="978-…"></label>
+      </div>
+      <details>
+        <summary id="chapterSummary">Chapters found</summary>
+        <ol id="chapters"></ol>
+        <p class="hint">Chapters are found from <b>Heading 1</b> in Word or Google Docs, or lines like “Chapter 1”. If a chapter is missing, make its title Heading 1 and choose the file again.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Step 2 -->
+  <section class="card" id="step2">
+    <h2><span class="num">2</span> Book settings</h2>
+    <div class="grid2">
+      <label>Paperback page size
+        <select id="trim"></select>
+      </label>
+      <label>Text size
+        <select id="fontSize">
+          <option value="">Automatic (recommended)</option>
+          <option>10</option><option>10.5</option><option>11</option><option>11.5</option><option>12</option><option>13</option><option>14</option>
+        </select>
+      </label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="dropCaps" checked> Big first letter (drop cap) at the start of each chapter</label>
+      <label><input type="checkbox" id="rectoChapters" checked> Start every chapter on a right-hand page</label>
+      <label><input type="checkbox" id="toc" checked> Add a contents page</label>
+      <label><input type="checkbox" id="hyphenate" checked> Split long words at line ends (English only), so spacing stays even</label>
+    </div>
+    <div class="grid2">
+      <label>Dedication (optional)<input id="dedication" placeholder="For my mother…"></label>
+      <label>Kindle cover picture (optional)
+        <span class="row"><button id="coverBtn">Choose picture…</button><span id="coverName" class="hint"></span></span>
+      </label>
+    </div>
+    <label>Extra lines for the copyright page (optional)<textarea id="copyrightExtra" rows="2" placeholder="Published by Gaz Media, Lagos"></textarea></label>
+  </section>
+
+  <!-- Step 3 -->
+  <section class="card" id="step3">
+    <h2><span class="num">3</span> Translate (optional)</h2>
+    <label class="checks"><input type="checkbox" id="doTranslate"> Translate my book into another language</label>
+    <div id="translateBox" class="hidden">
+      <div class="grid2">
+        <label>Translator
+          <select id="engine">
+            <option value="google">Google Translate (about 250 languages)</option>
+            <option value="claude">Claude (any other language, type its name)</option>
+          </select>
+        </label>
+        <label id="langPick">Language
+          <select id="lang"><option value="">Add your Google key in Settings first</option></select>
+        </label>
+        <label id="langType" class="hidden">Language name
+          <input id="langName" placeholder="e.g. Tiv, Urhobo, Ijaw">
+        </label>
+        <label id="langCodeBox" class="hidden">Language code (for Kindle)
+          <input id="langCode" placeholder="e.g. tiv, urh, ijc">
+        </label>
+      </div>
+      <p class="hint">Always ask a native speaker to read the translation before you publish it. Machine translation makes mistakes, especially in rare languages.</p>
+    </div>
+  </section>
+
+  <section class="card make">
+    <button class="primary big" id="makeBtn" disabled>Make my 3 book files</button>
+    <div id="progress" class="hidden"><div class="bar"><div id="barFill"></div></div><p id="progressText"></p></div>
+    <p class="error hidden" id="error"></p>
+    <div id="result" class="hidden">
+      <p class="ok">Done! Your files are saved.</p>
+      <ul id="files"></ul>
+      <p id="notes" class="hint"></p>
+      <button id="openFolder">Open the folder</button>
+    </div>
+  </section>
+</main>
+
+<dialog id="settings">
+  <h2>Settings</h2>
+  <p class="hint">Keys are only needed for translating. They are stored on this computer, locked to your Windows account.</p>
+  <label>Google Translate key<input id="googleKey" type="password" placeholder="AIza…"></label>
+  <p class="hint">Get one: Google Cloud Console › APIs &amp; Services › Enable “Cloud Translation API” › Credentials › Create API key. About $20 per million letters (a 300-page novel is about $10 per language).</p>
+  <label>Claude key<input id="claudeKey" type="password" placeholder="sk-ant-…"></label>
+  <p class="hint">Get one at console.anthropic.com › API keys.</p>
+  <div class="row end"><button id="settingsCancel">Cancel</button><button class="primary" id="settingsSave">Save</button></div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+name: Build GazBook
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm test
+      - name: Check the EPUB with the official EPUBCheck
+        run: |
+          curl -sSL -o epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.1.0/epubcheck-5.1.0.zip
+          unzip -q epubcheck.zip
+          java -jar epubcheck-5.1.0/epubcheck.jar test/sample.epub
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist
+      # Saved as a release (not an Actions artifact) so the installer is easy to download.
+      - name: Publish installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="gazbook-${{ github.run_number }}"
+          gh release create "$TAG" dist/GazBook-Setup-*.exe \
+            --target "${{ github.sha }}" --prerelease \
+            --title "GazBook build ${{ github.run_number }} (${GITHUB_REF_NAME})" \
+            --notes "Windows installer built from ${GITHUB_REF_NAME} at ${{ github.sha }}."

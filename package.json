@@ -1,0 +1,68 @@
+{
+  "name": "gazbook",
+  "version": "1.0.0",
+  "description": "Format books for Amazon KDP: print PDF, Kindle EPUB and Word, with translation.",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run-all.js",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "author": "Gaz Media",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "fontkit": "^2.0.4",
+    "htmlparser2": "^9.1.0",
+    "hyphen": "^1.14.1",
+    "jszip": "^3.10.2",
+    "mammoth": "^1.13.0",
+    "pdfjs-dist": "^4.10.38",
+    "pdfkit": "^0.20.2"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "productName": "GazBook",
+  "build": {
+    "appId": "ng.com.gazgoc.gazbook",
+    "productName": "GazBook",
+    "copyright": "Copyright © Gaz Media",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**",
+      "src/**",
+      "fonts/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/pdfjs-dist/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "GazBook-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GazBook",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
+  }
+}
