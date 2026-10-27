@@ -162,9 +162,34 @@ async function loadLanguages() {
 $('settingsBtn').onclick = () => {
   for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) $(k).value = settings[k] || '';
   $('localAi').checked = settings.localAi !== false;
+  $('aiSize').value = settings.aiSize || 'small';
+  showAiPack();
   $('settings').showModal();
 };
 $('geminiGet').onclick = (e) => { e.preventDefault(); window.gaz.geminiKeyPage(); };
+// AI pack
+async function showAiPack() {
+  try {
+    const st = await window.gaz.aiPackStatus();
+    $('aiPackState').textContent = st.ai && st.translator ? '✓ Both AIs are on this computer. The kit and translation work offline.'
+      : st.ai ? '✓ Writing AI is here. The offline translator downloads when first used.'
+        : st.translator ? '✓ Offline translator is here. The writing AI is not downloaded yet.'
+          : 'Not on this computer yet. It downloads by itself when first needed, or click "Download AI now".';
+  } catch { /* shown next time */ }
+}
+window.gaz.onAiPack((t) => { if (t) $('aiPackState').textContent = t; });
+const packBtn = (id, fn, done) => {
+  $(id).onclick = async (e) => {
+    e.preventDefault();
+    for (const b of ['aiPackDownload', 'aiPackSave', 'aiPackInstall']) $(b).disabled = true;
+    try { const r = await fn(); if (r) { await showAiPack(); if (done) $('aiPackState').textContent += ` ${done(r)}`; } } catch (err) { $('aiPackState').textContent = err.message; } finally {
+      for (const b of ['aiPackDownload', 'aiPackSave', 'aiPackInstall']) $(b).disabled = false;
+    }
+  };
+};
+packBtn('aiPackDownload', async () => { await window.gaz.setSettings({ aiSize: $('aiSize').value }); return window.gaz.aiPackDownload(); });
+packBtn('aiPackSave', () => window.gaz.aiPackSave(), (p) => `Saved to ${p}.`);
+packBtn('aiPackInstall', () => window.gaz.aiPackInstall(), () => 'Installed.');
 $('settingsCancel').onclick = () => $('settings').close();
 $('settingsSave').onclick = async () => {
   settings.googleKey = $('googleKey').value.trim();
@@ -172,7 +197,8 @@ $('settingsSave').onclick = async () => {
   settings.geminiKey = $('geminiKey').value.trim();
   settings.pexelsKey = $('pexelsKey').value.trim();
   settings.localAi = $('localAi').checked;
-  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, geminiKey: settings.geminiKey, pexelsKey: settings.pexelsKey, localAi: settings.localAi });
+  settings.aiSize = $('aiSize').value;
+  await window.gaz.setSettings({ googleKey: settings.googleKey, claudeKey: settings.claudeKey, geminiKey: settings.geminiKey, pexelsKey: settings.pexelsKey, localAi: settings.localAi, aiSize: settings.aiSize });
   $('settings').close();
   loadLanguages();
 };
