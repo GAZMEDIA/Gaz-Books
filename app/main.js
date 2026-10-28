@@ -91,12 +91,12 @@ ipcMain.handle('pick-cover', async () => {
 ipcMain.handle('languages', async (_e, engine, key) => (engine === 'gfree' ? googleFreeLanguages()
   : engine === 'offline' ? offlineLanguages() : googleLanguages(key)));
 
-// GazBook's built-in AI (on by default): used when Gemini is offline, busy or not set up.
+// GazBook's built-in AI (off unless turned on in Settings): used when Gemini is offline, busy or not set up.
 const localAi = require('./local-ai');
 const modelDir = () => process.env.GAZBOOK_MODEL_DIR || path.join(app.getPath('userData'), 'models', 'ai');
 function aiKeys(s = loadSettings()) {
   const keys = { geminiKey: s.geminiKey, claudeKey: s.claudeKey };
-  if (s.localAi !== false) keys.local = (o) => localAi.localJson(modelDir(), o, (msg) => win && win.webContents.send('progress', { step: msg, p: 0 }));
+  if (s.localAi === true) keys.local = (o) => localAi.localJson(modelDir(), o, (msg) => win && win.webContents.send('progress', { step: msg, p: 0 }));
   return keys;
 }
 

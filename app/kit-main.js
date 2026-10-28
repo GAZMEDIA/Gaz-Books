@@ -51,7 +51,7 @@ async function makePicture({ back, title, trim, keys, settings, saveAsJpeg, stat
       return { ...img, credit: pick.needsCredit ? pick.credit : '', note: `Free photo found for "${q}": ${pick.credit} (${pick.license}, ${pick.link}).${gemNote}` };
     } catch { /* try the next search */ }
   }
-  return { path: '', note: `No picture could be made or found${why ? ` (${why})` : ''}, so the cover uses plain colour. You can add a picture in "Make my cover".` };
+  return { path: '', note: `No picture could be made or found${why ? ` (${why})` : ''}, so the cover uses plain colour. For a free painted picture: copy the cover prompt in this file into gemini.google.com, download the picture, choose it in "Make my cover" › "Use my own picture", and make the kit again.` };
 }
 
 // A step that needs the AI. If it still fails after the retries, the kit goes

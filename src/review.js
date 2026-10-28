@@ -7,7 +7,6 @@ const { collect, batches } = require('./translate');
 const { plain } = require('./read');
 const { htmlToRuns, runsToHtml } = require('./translate');
 const { languageToolFix, applyToRuns } = require('./languagetool');
-const { findSuspects } = require('./spell');
 const { MIN_PAGES, MAX_PAGES, gutterFor } = require('./kdp');
 const { coverSize } = require('./cover');
 
@@ -143,72 +142,26 @@ ${JSON.stringify(texts)}`,
   // spelling and grammar instead (no key needed).
   if (!cloud) { missed.push(...items); skipped = items.length; }
   let backup = '';
-  if (missed.length && cloud) {
+  if (missed.length) {
     const paras = missed.filter((it) => !it.plainText).map((it) => ({ runs: htmlToRuns(it.get()), set: (runs) => it.set(runsToHtml(runs)) }));
     try {
       const lt = await languageToolFix(paras, { code, styleSheet, onProgress });
       if (!lt.unsupported) {
         changes.push(...lt.changes.map((c) => ({ ...c, why: `${c.why}, LanguageTool` })));
-        backup = `Gemini was busy for ${skipped} of ${items.length} paragraphs; the free LanguageTool checker corrected their spelling and grammar instead.`;
+        backup = cloud
+          ? `Gemini was busy for ${skipped} of ${items.length} paragraphs; the free LanguageTool checker corrected their spelling and grammar instead.`
+          : 'Spelling and grammar were corrected by the free LanguageTool checker. Add your free Gemini key in Settings for a deeper check (consistency and style).';
         skipped = 0;
       }
-    } catch { /* LanguageTool unreachable (offline): the built-in AI below */ }
+    } catch { /* LanguageTool unreachable (offline) */ }
   }
-  if (skipped && keys.local) {
-    const lp = await localProofread(missed.filter((it) => !it.plainText), keys, { code, language, styleSheet, onProgress });
-    changes.push(...lp.changes);
-    if (lp.supported) {
-      backup = `${cloud ? `Gemini could not check ${skipped} of ${items.length} paragraphs. ` : ''}Spelling was checked on this computer (dictionary + GazBook's built-in AI). For a full grammar check, run the kit again when you are online with your Gemini key.`;
-      skipped = 0;
-    } else {
-      backup = `There is no offline dictionary for ${language || 'this language'} yet, so ${skipped} paragraphs were not proofread. Run the kit again when you are online with your Gemini key.`;
-      skipped = 0;
-    }
+  // No internet: the built-in AI is far too slow to read a whole book on an
+  // ordinary computer (hours), so the book is left as it is and the kit says so.
+  if (skipped) {
+    backup = `${skipped} of ${items.length} paragraphs were not proofread because there was no internet connection. Run the kit again when you are online.`;
+    skipped = 0;
   }
   return { book: copy, changes, skipped, total: items.length, backup };
-}
-
-// Offline proofreading: dictionaries find sentences with unknown words, the
-// built-in AI fixes only those sentences, and the fixes go back into the text
-// word by word (so italics and bold stay where they were).
-async function localProofread(missed, keys, { code, language, styleSheet, onProgress = () => {} }) {
-  const paras = missed.map((it) => ({ it, runs: htmlToRuns(it.get()) }));
-  const texts = paras.map((p) => plain(p.runs));
-  const { supported, suspects } = findSuspects(texts, { code, language });
-  if (!supported) return { supported, changes: [] };
-  const changes = [];
-  const words = (t) => [...t.matchAll(/\p{L}+(?:['’]\p{L}+)?/gu)].map((m) => ({ w: m[0], at: m.index }));
-  const fixes = paras.map(() => []);
-  for (let i = 0; i < suspects.length; i += 10) {
-    const group = suspects.slice(i, i + 10);
-    let r;
-    try {
-      r = await aiJson({ local: keys.local }, {
-        system: 'You are a careful proofreader.',
-        prompt: `Correct the spelling (and any obvious grammar mistake) in each sentence of this JSON array${language ? ` (${language})` : ''}. Words that look wrong: ${[...new Set(group.flatMap((g) => g.words))].join(', ')}. Keep everything else exactly the same. ${styleText(styleSheet)}
-Return items: one corrected sentence for each input sentence, in the same order.
-${JSON.stringify(group.map((g) => g.sentence))}`,
-        schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
-        maxTokens: 2000,
-      });
-    } catch { continue; }
-    (r.items || []).slice(0, group.length).forEach((fixed, k) => {
-      const g = group[k];
-      const a = words(g.sentence); const b = words(fixed || '');
-      if (a.length !== b.length) return; // the AI rewrote too much: leave the sentence
-      const start = texts[g.para].indexOf(g.sentence);
-      if (start < 0) return;
-      a.forEach((x, n) => {
-        if (x.w !== b[n].w && g.words.includes(x.w)) {
-          fixes[g.para].push({ offset: start + x.at, length: x.w.length, value: b[n].w });
-          changes.push({ before: x.w, after: b[n].w, why: 'spelling, checked on this computer' });
-        }
-      });
-    });
-    onProgress(Math.min(1, (i + 10) / suspects.length));
-  }
-  paras.forEach((p, k) => { if (fixes[k].length) p.it.set(runsToHtml(applyToRuns(p.runs, fixes[k]))); });
-  return { supported, changes };
 }
 
 // ---------------------------------------------------------------- listing

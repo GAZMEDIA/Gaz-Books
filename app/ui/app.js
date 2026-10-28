@@ -161,7 +161,7 @@ async function loadLanguages() {
 // Settings
 $('settingsBtn').onclick = () => {
   for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) $(k).value = settings[k] || '';
-  $('localAi').checked = settings.localAi !== false;
+  $('localAi').checked = settings.localAi === true;
   $('settings').showModal();
 };
 $('geminiGet').onclick = (e) => { e.preventDefault(); window.gaz.geminiKeyPage(); };
@@ -209,6 +209,7 @@ $('makeBtn').onclick = async () => {
     opts.kit = true;
     if (window.coverSpec) opts.coverSpec = window.coverSpec();
   }
+  if (!opts.title) return showError('Type the book\'s title in the Title box first. GazBook could not find it in your file, and the covers need it.');
   window.gaz.setSettings({ trim: opts.trim, author: opts.author });
   $('makeBtn').disabled = true;
   $('progress').classList.remove('hidden');

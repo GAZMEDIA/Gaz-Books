@@ -61,9 +61,11 @@
   function showCoverPrompt(text) {
     const d = document.createElement('div');
     d.className = 'prompt';
-    d.innerHTML = '<b><span>Cover prompt written from your book</span><button>Copy</button></b><div></div>';
+    d.innerHTML = '<b><span>Cover prompt written from your book</span><button>Copy</button><button>Copy and open Gemini</button></b><div></div><p class="hint">For a free painted picture: click "Copy and open Gemini", paste the prompt there, download the picture, then click "Use my own picture" here.</p>';
     d.querySelector('div').textContent = text;
-    d.querySelector('button').onclick = (e) => { navigator.clipboard.writeText(text); e.target.textContent = 'Copied'; };
+    const [copy, gem] = d.querySelectorAll('button');
+    copy.onclick = (e) => { navigator.clipboard.writeText(text); e.target.textContent = 'Copied'; };
+    gem.onclick = () => { navigator.clipboard.writeText(text); window.gaz.openLink('https://gemini.google.com/app'); };
     $('prompts').prepend(d);
   }
   function showSearchIdeas(words) {
