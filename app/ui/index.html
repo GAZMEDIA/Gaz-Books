@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'">
+<title>GazBook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><img class="logo" src="../icon.png" alt=""> GazBook <small>Amazon KDP book formatter</small></div>
+  <nav class="tabs"><button class="tab on" data-tab="book">1. Format my book</button><button class="tab" data-tab="cover">2. Make my cover</button></nav>
+  <div class="row"><button class="badge" id="planBtn">…</button><button class="link" id="settingsBtn">Settings</button></div>
+</header>
+
+<main id="tab-book">
+  <!-- Step 1 -->
+  <section class="card" id="step1">
+    <h2><span class="num">1</span> Choose your book</h2>
+    <div class="drop" id="drop">
+      <p><b>Drag your book here</b> or</p>
+      <button class="primary" id="pickBtn">Choose file…</button>
+      <p class="hint">Word (.docx), PDF, or text. From Google Docs: <b>File › Download › Microsoft Word (.docx)</b>.</p>
+    </div>
+    <div id="bookInfo" class="hidden">
+      <p class="ok" id="bookFile"></p>
+      <div class="grid2">
+        <label>Book title<input id="title"></label>
+        <label>Author name<input id="author"></label>
+        <label>Subtitle (optional)<input id="subtitle"></label>
+        <label>ISBN (optional)<input id="isbn" placeholder="978-…"></label>
+      </div>
+      <details>
+        <summary id="chapterSummary">Chapters found</summary>
+        <ol id="chapters"></ol>
+        <p class="hint">Chapters are found from <b>Heading 1</b> in Word or Google Docs, or lines like “Chapter 1”. If a chapter is missing, make its title Heading 1 and choose the file again.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Step 2 -->
+  <section class="card" id="step2">
+    <h2><span class="num">2</span> Book settings</h2>
+    <div class="grid2">
+      <label>Paperback page size
+        <select id="trim"></select>
+      </label>
+      <label>Text size
+        <select id="fontSize">
+          <option value="">Automatic (recommended)</option>
+          <option>10</option><option>10.5</option><option>11</option><option>11.5</option><option>12</option><option>13</option><option>14</option>
+        </select>
+      </label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="dropCaps" checked> Big first letter (drop cap) at the start of each chapter</label>
+      <label><input type="checkbox" id="rectoChapters" checked> Start every chapter on a right-hand page</label>
+      <label><input type="checkbox" id="toc" checked> Add a contents page</label>
+      <label><input type="checkbox" id="hyphenate" checked> Split long words at line ends (English only), so spacing stays even</label>
+    </div>
+    <div class="grid2">
+      <label>Dedication (optional)<input id="dedication" placeholder="For my mother…"></label>
+      <label>Kindle cover picture (optional)
+        <span class="row"><button id="coverBtn">Choose picture…</button><span id="coverName" class="hint"></span></span>
+      </label>
+    </div>
+    <label>Extra lines for the copyright page (optional)<textarea id="copyrightExtra" rows="2" placeholder="Published by Gaz Media, Lagos"></textarea></label>
+  </section>
+
+  <!-- Step 3 -->
+  <section class="card" id="step3">
+    <h2><span class="num">3</span> Translate (optional)</h2>
+    <label class="checks"><input type="checkbox" id="doTranslate"> Translate my book into another language</label>
+    <div id="translateBox" class="hidden">
+      <div class="grid2">
+        <label>Translator
+          <select id="engine">
+            <option value="gfree">Google free (no key, about 250 languages)</option>
+            <option value="offline">On this computer (free, about 100 languages, works offline)</option>
+            <option value="google">Google with your own key</option>
+            <option value="gemini">Gemini (free Google key, any language, type its name)</option>
+            <option value="claude">Claude (paid key, any language, type its name)</option>
+          </select>
+        </label>
+        <label id="langPick">Language
+          <select id="lang"><option value="">Loading languages…</option></select>
+        </label>
+        <label id="sourceBox" class="hidden">My book is written in
+          <select id="source"></select>
+        </label>
+        <label id="langType" class="hidden">Language name
+          <input id="langName" placeholder="e.g. Tiv, Urhobo, Ijaw">
+        </label>
+        <label id="langCodeBox" class="hidden">Language code (for Kindle)
+          <input id="langCode" placeholder="e.g. tiv, urh, ijc">
+        </label>
+      </div>
+      <div class="row"><button id="addLang">+ Add another language</button><span class="hint">Studio plan: make the book in many languages in one go.</span></div>
+      <ul id="moreLangs" class="chips"></ul>
+      <label class="checks"><input type="checkbox" id="translateCover" checked> Also make the front and back cover in each language (uses the cover from "Make my cover")</label>
+      <p class="hint hidden" id="offlineNote">The first time, the free translator downloads once (about 500 MB). After that it works without internet. It keeps the words but not italics or bold.</p>
+      <p class="hint">Always ask a native speaker to read the translation before you publish it. Machine translation makes mistakes, especially in rare languages.</p>
+    </div>
+  </section>
+
+  <section class="card make">
+    <label class="checks kit"><input type="checkbox" id="kit" checked> <span><b>Make the complete Amazon kit (recommended).</b> Gemini reads the whole book, corrects spelling, grammar and consistency, checks it against Amazon's rules, paints the cover picture, makes the paperback and Kindle covers, and writes the description, About the Book, 14 keywords and 7 categories, for the original book and every translation. Works online with your free Gemini key, and offline with GazBook's built-in AI.</span></label>
+    <button class="primary big" id="makeBtn" disabled>Make my Amazon kit</button>
+    <div id="progress" class="hidden"><div class="bar"><div id="barFill"></div></div><p id="progressText"></p></div>
+    <p class="error hidden" id="error"></p>
+    <div id="result" class="hidden">
+      <p class="ok">Done! Your files are saved.</p>
+      <ul id="files"></ul>
+      <p id="notes" class="hint"></p>
+      <button id="openFolder">Open the folder</button>
+    </div>
+  </section>
+</main>
+
+
+<main id="tab-cover" class="hidden">
+  <section class="card">
+    <h2><span class="num">A</span> Cover size (Amazon KDP)</h2>
+    <div class="grid3">
+      <label>Page size<select id="cTrim"></select></label>
+      <label>Number of pages<input id="cPages" type="number" min="24" max="828" value="200"></label>
+      <label>Paper and ink<select id="cPaper">
+        <option value="white">Black ink, white paper</option><option value="cream">Black ink, cream paper</option>
+        <option value="color-standard">Standard colour, white paper</option><option value="color-premium">Premium colour, white paper</option>
+      </select></label>
+    </div>
+    <div class="sizebox" id="sizeBox"></div>
+    <p class="hint">Same sums as Amazon's cover calculator. To double-check, open <a href="#" id="kdpCalc">Amazon's cover calculator</a> and enter the same page size, pages and paper.</p>
+    <div class="grid3">
+      <label>Your price in US dollars (optional)<input id="cPrice" type="number" step="0.01" min="0" placeholder="12.99"></label>
+      <div class="est" id="estBox"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">B</span> Words on the cover</h2>
+    <div class="grid3">
+      <label>Title<input id="cTitle"></label>
+      <label>Subtitle<input id="cSubtitle"></label>
+      <label>Author<input id="cAuthor"></label>
+    </div>
+    <div class="row"><button class="primary" id="aiBtn">✨ Write the back cover for me</button><span class="hint" id="aiNote">Uses Gemini (free key, add it in Settings) or Claude. Reads the start of your book.</span></div>
+    <label>Tagline (one strong line)<input id="cTagline" placeholder="One river. One night. Every secret rising."></label>
+    <label>Back cover description<textarea id="cBlurb" rows="6"></textarea></label>
+    <label>About the author (optional)<textarea id="cBio" rows="2"></textarea></label>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">C</span> Cover picture</h2>
+    <div class="subtabs"><button class="st on" data-st="search">Search free pictures online</button><button class="st" data-st="own">Use my own picture</button><button class="st" data-st="prompts">Picture prompts (for AI picture makers)</button></div>
+    <div id="st-search">
+      <div class="row"><input id="q" placeholder="e.g. river sunset Africa"><select id="orient"><option value="landscape">Whole cover (wide)</option><option value="portrait">Front only (tall)</option></select><button class="primary" id="searchBtn">Search</button></div>
+      <p class="hint" id="searchNote">Only pictures you may use on a book you sell, big enough to print sharply. Free Pexels key in Settings adds more photos.</p>
+      <div class="results" id="results"></div>
+    </div>
+    <div id="st-own" class="hidden">
+      <button id="ownBtn">Choose picture…</button>
+      <p class="hint">Use a picture you made or bought. For a sharp print it should be at least the pixel size shown in step A.</p>
+    </div>
+    <div id="st-prompts" class="hidden">
+      <div class="grid2">
+        <label>Kind of book<input id="pGenre" placeholder="thriller, romance, memoir…"></label>
+        <label>Feeling<input id="pMood" placeholder="dark and tense, warm, hopeful…"></label>
+        <label>Place<input id="pSetting" placeholder="a flooded market town in Nigeria"></label>
+        <label>What should be in the picture<input id="pDetails" placeholder="a girl on a rooftop at dawn, red sky"></label>
+      </div>
+      <button id="promptBtn">Make prompts</button>
+      <div id="prompts"></div>
+      <p class="hint">Paste a prompt into any AI picture maker (for example ChatGPT, Gemini or Midjourney), download the picture, then use "Use my own picture".</p>
+    </div>
+    <div class="chosen hidden" id="chosen"><img id="chosenImg" alt=""><div><b id="chosenInfo"></b><p class="hint" id="chosenCredit"></p></div></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">D</span> Look and save</h2>
+    <div class="grid3">
+      <label>Picture covers<select id="cMode"><option value="wrap">The whole cover</option><option value="front">Only the front</option></select></label>
+      <label>Style<select id="cStyle"><option value="classic">Classic</option><option value="modern">Modern (bold capitals)</option><option value="elegant">Elegant</option></select></label>
+      <label>Colours<span class="row"><input type="color" id="cBg" value="#1d2433" title="Background"><input type="color" id="cInk" value="#ffffff" title="Writing"></span></label>
+    </div>
+    <label class="checks"><input type="checkbox" id="cGuides" checked> Show the cutting and safe lines in the preview (they are never printed)</label>
+    <div class="row"><button id="previewBtn">Update preview</button><button class="primary" id="saveCoverBtn">Save my cover</button></div>
+    <p class="error hidden" id="coverError"></p>
+    <div class="preview"><img id="previewImg" alt=""></div>
+    <div id="coverResult" class="hidden">
+      <p class="ok">Cover saved.</p>
+      <ul id="coverFiles"></ul>
+      <p class="hint">The Kindle cover is also added to your ebook the next time you click "Make my 3 book files".</p>
+    </div>
+  </section>
+</main>
+
+<dialog id="settings">
+  <h2>Settings</h2>
+  <p class="hint">All keys are optional: “Google free” and “On this computer” translate with no key. Keys are stored on this computer, locked to your Windows account.</p>
+  <label>Google Translate key (optional, paid)<input id="googleKey" type="password" placeholder="AIza…"></label>
+  <p class="hint">Get one: Google Cloud Console › APIs &amp; Services › Enable “Cloud Translation API” › Credentials › Create API key. About $20 per million letters (a 300-page novel is about $10 per language).</p>
+  <label>Gemini key (free)<input id="geminiKey" type="password" placeholder="AIza…"></label>
+  <div class="row"><button id="geminiGet">Get my free Gemini key</button><span class="hint">Sign in with your Gmail, click “Create API key”, copy it and paste it here.</span></div>
+  <p class="hint">For writing your back cover and translating into rare languages (Tiv, Urhobo, Ijaw…). Free with a daily limit.</p>
+  <label>Claude key (optional, paid)<input id="claudeKey" type="password" placeholder="sk-ant-…"></label>
+  <p class="hint">Only if you prefer Claude. Get one at console.anthropic.com › API keys.</p>
+  <label class="checks"><input type="checkbox" id="localAi"> Use GazBook's built-in AI when there is no internet, or Gemini is busy or not set up (free, no key, but a big one-time download of about 2.5 GB and much slower than Gemini; it writes the listing and back cover, not the proofreading)</label>
+  <label>Pexels key (free)<input id="pexelsKey" type="password"></label>
+  <p class="hint">More free cover photos. Get one at pexels.com/api (free sign-up).</p>
+  <div class="row end"><button id="settingsCancel">Cancel</button><button class="primary" id="settingsSave">Save</button></div>
+</dialog>
+
+<dialog id="planDlg">
+  <h2>Your GazBook plan</h2>
+  <p id="planNow" class="sizebox"></p>
+  <table class="plans">
+    <tr><th>Starter</th><td>$14 / ₦20,000 a year</td><td>PDF, Kindle and Word files, every KDP size, drop caps</td></tr>
+    <tr><th>Writer</th><td>$36 / ₦50,000 a year</td><td>+ cover maker (KDP cover calculator, free pictures)</td></tr>
+    <tr><th>Publisher</th><td>$64 / ₦90,000 a year</td><td>+ translation and AI (Gemini or Claude) writing your back cover</td></tr>
+    <tr><th>Studio</th><td>$107 / ₦150,000 a year</td><td>+ many languages in one go</td></tr>
+  </table>
+  <div class="row"><button class="primary" id="buyBtn">Buy or renew a plan</button><span class="hint">Pay by card or bank transfer. Your code comes by email.</span></div>
+  <h3>Have a code?</h3>
+  <label>Email you bought it with<input id="licEmail" type="email"></label>
+  <label>Code<textarea id="licCode" rows="2" placeholder="P20271027-…"></textarea></label>
+  <p class="error hidden" id="licError"></p>
+  <div class="row end"><button id="planClose">Close</button><button class="primary" id="licSave">Unlock</button></div>
+</dialog>
+
+<script src="app.js"></script>
+<script src="cover.js"></script>
+</body>
+</html>
