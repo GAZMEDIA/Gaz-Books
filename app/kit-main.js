@@ -134,11 +134,13 @@ module.exports = function kitMain({ renderCover, saveAsJpeg }) {
         ...baseOpts,
         translate: job.tr || undefined,
         beforeLayout: job.tr ? async (b) => {
-          status(`Reading the ${job.language} edition for Amazon's checks`);
-          review = await tryAI(`The ${job.language} content review`, () => reviewBook(b, keys, job.language), NO_REVIEW);
-          const r = await proofreadBook(b, keys, { language: job.language, code: job.tr.target, styleSheet: review.styleSheet, onProgress: (p) => status('Checking spelling, grammar and consistency', p) });
+          // The original was fully checked by Gemini before translating, so the
+          // translation keeps that review and gets the free LanguageTool check
+          // (spelling, grammar, typography of the language): no Gemini allowance used.
+          review = review0;
+          const r = await proofreadBook(b, {}, { language: job.language, code: job.tr.target, styleSheet: review.styleSheet, onProgress: (p) => status('Checking spelling and grammar', p) });
           changes = r.changes;
-          if (r.backup) problems.push(r.backup);
+          if (r.backup) problems.push(/not proofread/.test(r.backup) ? `The ${job.language} edition: ${r.backup}` : `The ${job.language} edition: the original was proofread by Gemini before translating, and this translation was checked by the free LanguageTool checker.`);
           if (r.skipped) problems.push(`${r.skipped} of ${r.total} paragraphs of the ${job.language} edition could not be proofread this time (Gemini was busy). Press "Make my Amazon kit" again later to finish them.`);
           return r.book;
         } : undefined,
