@@ -56,7 +56,7 @@ const STYLES = {
   elegant: { title: 'Crimson', body: 'Crimson', titleCase: 'uppercase', spacing: '0.12em' },
 };
 
-// spec: { size, title, subtitle, author, tagline, blurb, bio, image (file path or data URL),
+// spec: { size, title, subtitle, author, tagline, blurb, bio, authorPhoto (data URL), image (file path or data URL),
 //         imageMode: 'wrap' | 'front', bg, ink, style, guides }
 function coverHtml(spec) {
   const s = spec.size;
@@ -96,14 +96,15 @@ body{position:relative;background:${bg};color:${ink};font-family:${st.body},seri
 .back .box{position:absolute;left:${safe}in;right:${0.25}in;top:${safe}in;max-height:${(s.height - safe - (BLEED + 0.25 + BARCODE.h + 0.2)).toFixed(3)}in;overflow:hidden;background:${wrap && img ? 'rgba(0,0,0,.42)' : 'transparent'};padding:0.28in 0.3in;border-radius:0.04in}
 .back .tag{font-family:${st.title},serif;font-size:${Math.min(0.26, s.trimW * 0.045)}in;line-height:1.15;margin-bottom:0.16in;text-transform:${st.titleCase === 'uppercase' ? 'uppercase' : 'none'}}
 .back .blurb p{font-size:${s.trimW < 5.6 ? 10.5 : 11.5}pt;line-height:1.38;margin-bottom:0.09in;text-align:justify}
-.back .bio{margin-top:0.18in;font-style:italic;font-size:${s.trimW < 5.6 ? 9 : 10}pt;line-height:1.35;opacity:.9}
+.back .bio{margin-top:0.18in;font-style:italic;font-size:${s.trimW < 5.6 ? 9 : 10}pt;line-height:1.35;opacity:.9;overflow:hidden}
+.back .bio .ap{float:left;width:0.85in;height:0.85in;object-fit:cover;border-radius:50%;margin:0.02in 0.16in 0.06in 0;border:0.03in solid ${ink}}
 .barcode{position:absolute;right:0.25in;bottom:${BLEED + 0.25}in;width:${BARCODE.w}in;height:${BARCODE.h}in;background:#fff;color:#999;font:8pt sans-serif;display:flex;align-items:center;justify-content:center}
 .g{position:absolute;pointer-events:none}
 </style></head><body>
 ${img && wrap ? `<div class="art" style="left:0;right:0"></div>` : ''}
 ${img && !wrap ? `<div class="art" style="left:${s.front.x}in;width:${s.front.w}in"></div>` : ''}
 <div class="panel back" style="left:0;width:${s.back.w}in">
-  <div class="box">${spec.tagline ? `<div class="tag">${esc(spec.tagline)}</div>` : ''}<div class="blurb">${paras(spec.blurb)}</div>${spec.bio ? `<div class="bio">${paras(spec.bio)}</div>` : ''}</div>
+  <div class="box">${spec.tagline ? `<div class="tag">${esc(spec.tagline)}</div>` : ''}<div class="blurb">${paras(spec.blurb)}</div>${spec.bio || spec.authorPhoto ? `<div class="bio">${spec.authorPhoto ? `<img class="ap" src="${spec.authorPhoto}" alt="">` : ''}${paras(spec.bio)}</div>` : ''}</div>
   <div class="barcode">${spec.guides ? 'Barcode area (KDP adds it)' : ''}</div>
 </div>
 <div class="panel spine" style="left:${s.spineBox.x}in;width:${s.spine}in">${spineWords ? `<div class="w">${spineWords}</div>` : ''}</div>
@@ -113,6 +114,33 @@ ${img && !wrap ? `<div class="art" style="left:${s.front.x}in;width:${s.front.w}
   <div class="a">${esc(spec.author)}</div>
 </div>
 ${guides}
+<script>
+// Longer languages (German runs about 30% longer than English): shrink the
+// words a little at a time until they fit, so nothing is ever cut off.
+(function () {
+  function shrink(el, sel, ok, min) {
+    if (!el) return;
+    var parts = sel ? el.querySelectorAll(sel) : [el];
+    for (var k = 0; k < 40 && !ok(); k++) {
+      for (var i = 0; i < parts.length; i++) {
+        var fs = parseFloat(getComputedStyle(parts[i]).fontSize);
+        parts[i].style.fontSize = (fs * 0.95) + 'px';
+      }
+      if (parts.length && parseFloat(getComputedStyle(parts[0]).fontSize) < min) break;
+    }
+  }
+  function fit() {
+    var box = document.querySelector('.back .box');
+    shrink(box, '.tag, .blurb p, .bio p', function () { return box.scrollHeight <= box.clientHeight + 1; }, 8);
+    var h1 = document.querySelector('.front h1');
+    var lh = h1 && parseFloat(getComputedStyle(h1).lineHeight);
+    shrink(h1, '', function () { return h1.scrollWidth <= h1.clientWidth + 1 && h1.offsetHeight <= lh * 4.2; }, 14);
+    var sp = document.querySelector('.spine .w');
+    shrink(sp, '', function () { return sp.scrollHeight <= sp.parentNode.clientHeight - 20; }, 6);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit); else window.addEventListener('load', fit);
+})();
+</script>
 </body></html>`;
 }
 

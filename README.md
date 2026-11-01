@@ -1,6 +1,30 @@
 # GazBook
 
-A Windows app that turns a book manuscript into Amazon KDP-ready files:
+A Windows app that turns a book manuscript into Amazon KDP-ready files.
+
+## One click (new in 1.5)
+
+Put the book in, tick the languages, press **Make my books**. In about a
+minute (on a normal 4–8 core laptop, for a 50,000-word book and a few
+languages) you get one folder and one zip with, for every language:
+
+- paperback PDF, Kindle EPUB and Word file
+- Kindle cover (JPG) and paperback cover (PDF, sized like Amazon's cover
+  calculator for that language's page count)
+- the author's "About the Author" page with photo, translated
+- the Amazon listing (description, 7 keywords, categories, author bio) and a
+  plain-words upload guide, including Amazon's AI-translation question
+- one "Cover picture prompt" to paste into Gemini; drop the picture back into
+  GazBook and every language's covers are redrawn with it
+
+No keys and no fees: translation runs on the computer (`translator/`,
+CTranslate2 with free OPUS-MT and M2M100 models). Each language is
+downloaded once from this repository's `models-v1` release, made by the
+**Build translator files** workflow (run it once from the Actions tab).
+Only languages Amazon accepts are offered. `npm run speed` checks the
+one-minute promise with a same-size test translator.
+
+## Everything else ("More tools")
 
 - **Paperback PDF**: your chosen KDP trim size, mirrored margins with the right
   inside (gutter) margin for the page count, chapters on right-hand pages, drop
@@ -14,8 +38,8 @@ straight quotes become curly quotes, `--` becomes an em dash, `...` becomes an
 ellipsis, extra spaces and empty lines go, scene breaks (`***`, `#`) are kept,
 and the old copyright and contents pages are replaced.
 
-Optional translation: Google Translate (about 250 languages, needs a Google
-Cloud key) or Claude (any language you can name, needs an Anthropic key).
+Other translators: on this computer (free, see above), Google free, Google
+Translate (needs a Google Cloud key), Gemini or Claude (need a key).
 Print PDFs are made for Latin, Greek and Cyrillic scripts; for other scripts the
 app makes the EPUB and Word files and says so.
 
@@ -37,11 +61,14 @@ Download `GazBook-Setup-x.y.z.exe` from the latest release and run it.
 npm install
 npm start        # run the app
 npm test         # build sample books from .md, .docx and .pdf
-npm run dist     # Windows installer in dist/ (run on Windows)
+npm run speed    # the one-minute check (needs: pip install ctranslate2 sentencepiece numpy)
+npm run dist     # Windows installer in dist/, with its own small Python for the translator
 ```
 
-Code: `src/` is the engine (read, pdf, epub, docx, translate), `app/` is the
-Electron window. Fonts in `fonts/` are under the SIL Open Font License.
+Code: `src/` is the engine (read, pdf, epub, docx, translate, quick = the
+one-click job, kit-offline = the listing), `app/` is the Electron window
+(`ui/quick.html` is the one-click screens), `translator/` is the on-computer
+translator and the scripts that build its language files. Fonts in `fonts/` are under the SIL Open Font License.
 
 ## Plans
 

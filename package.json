@@ -1,18 +1,18 @@
 {
   "name": "gazbook",
-  "version": "1.4.4",
-  "description": "Format books for Amazon KDP: print PDF, Kindle EPUB and Word, with translation.",
+  "version": "1.5.0",
+  "description": "Format books for Amazon KDP in under a minute: translated paperback PDF, Kindle EPUB, Word, covers and marketing kit.",
   "main": "app/main.js",
   "scripts": {
     "start": "electron .",
     "test": "node test/run-all.js",
-    "dist": "electron-builder --win nsis --publish never"
+    "dist": "node scripts/bundle-python.js && electron-builder --win nsis --publish never",
+    "speed": "node test/speed.js"
   },
   "author": "Gaz Media",
   "license": "UNLICENSED",
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
-    "@huggingface/transformers": "^4.3.1",
     "fontkit": "^2.0.4",
     "htmlparser2": "^9.1.0",
     "hyphen": "^1.14.1",
@@ -40,19 +40,12 @@
       "src/**",
       "fonts/**",
       "package.json",
-      "!node_modules/onnxruntime-web/**",
-      "!node_modules/onnxruntime-node/bin/napi-v*/{darwin,linux}/**",
-      "!node_modules/@huggingface/transformers/dist/{transformers.js,transformers.min.js,transformers.web.js,transformers.web.min.js,*.mjs,*.map}",
-      "!node_modules/@huggingface/transformers/{src,types}/**",
       "!node_modules/@node-llama-cpp/*cuda*/**",
       "!node_modules/@node-llama-cpp/{linux,mac}-*/**",
       "!node_modules/node-llama-cpp/llama/llama.cpp/**"
     ],
     "asarUnpack": [
       "node_modules/pdfjs-dist/**",
-      "node_modules/onnxruntime-node/**",
-      "node_modules/sharp/**",
-      "node_modules/@img/**",
       "node_modules/node-llama-cpp/**",
       "node_modules/@node-llama-cpp/**"
     ],
@@ -77,6 +70,22 @@
       "shortcutName": "GazBook",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/python",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "translator",
+        "to": "translator",
+        "filter": [
+          "worker.py"
+        ]
+      }
+    ]
   }
 }

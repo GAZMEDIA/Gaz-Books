@@ -45,6 +45,7 @@ $('planBtn').onclick = () => {
   $('licError').classList.add('hidden');
   $('planDlg').showModal();
 };
+$('quickBtn').onclick = () => window.gaz.openQuick();
 $('planClose').onclick = () => $('planDlg').close();
 $('buyBtn').onclick = () => window.gaz.openLink(`${lic.buyUrl}?email=${encodeURIComponent($('licEmail').value.trim())}`);
 $('licSave').onclick = async () => {

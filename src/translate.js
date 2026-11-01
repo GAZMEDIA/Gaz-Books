@@ -3,8 +3,8 @@
 //  - Google free ('gfree'): the free web translator (the one Google's own
 //    pages use), no key, about 250 languages. Google can slow it down or
 //    block it at any time, so it waits between parts and retries.
-//  - On this computer ('offline'): M2M100 (MIT licence) running in the app,
-//    free, about 100 languages; see app/offline-main.js.
+//  - On this computer ('offline'): GazBook's own fast translator, free, no
+//    key, every CPU core; see src/fast-translate.js and app/offline-main.js.
 //  - Google Translate ('google'): the paid Cloud API, needs an API key.
 //  - Claude: any language you can name (best for languages Google lacks),
 //    needs an Anthropic API key. Quality drops for very rare languages.
@@ -175,7 +175,7 @@ async function geminiTranslate(texts, language, key) {
 // ---------------------------------------------------------------- main
 
 // One group of texts (HTML with <i>/<b>) through the chosen engine.
-async function translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline }) {
+async function translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline, onPart }) {
   if (engine === 'gemini') return geminiTranslate(texts, language || target, geminiKey);
   if (engine === 'claude') return claudeTranslate(texts, language || target, claudeKey);
   if (engine === 'gfree') {
@@ -184,7 +184,7 @@ async function translateTexts(texts, { engine, target, language, googleKey, clau
       throw e;
     }
   }
-  if (engine === 'offline') return offline(texts, source || 'en', target);
+  if (engine === 'offline') return offline(texts, source || 'en', target, onPart);
   return googleTranslate(texts, target, googleKey, source);
 }
 
@@ -206,11 +206,11 @@ async function translateBook(book, { engine, target, language, googleKey, claude
   const items = collect(copy);
   const groups = engine === 'claude' || engine === 'gemini' ? batches(items, 12000, 80)
     : engine === 'gfree' ? batches(items, 4000, 40)
-      : engine === 'offline' ? batches(items, 2000, 8) : batches(items, 25000, 120);
+      : engine === 'offline' ? [items] : batches(items, 25000, 120); // offline: the whole book at once, the worker shares it across the cores
   let done = 0;
   for (const g of groups) {
     const texts = g.map((it) => (it.plainText ? runsToHtml([{ text: it.get() }]) : it.get()));
-    const out = await translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline });
+    const out = await translateTexts(texts, { engine, target, language, googleKey, claudeKey, geminiKey, source, offline, onPart: (p) => onProgress((done + p * g.length) / items.length) });
     g.forEach((it, i) => it.set(it.plainText ? plain(htmlToRuns(out[i])) : out[i]));
     done += g.length;
     onProgress(done / items.length);

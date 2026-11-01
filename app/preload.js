@@ -24,4 +24,20 @@ contextBridge.exposeInMainWorld('gaz', {
   geminiKeyPage: () => ipcRenderer.invoke('gemini-key-page'),
   coverExport: (o) => ipcRenderer.invoke('cover-export', o),
   onProgress: (fn) => ipcRenderer.on('progress', (_e, d) => fn(d)),
+  openStudio: () => ipcRenderer.invoke('open-studio'),
+  openQuick: () => ipcRenderer.invoke('open-quick'),
+  // the one-click screens
+  quick: {
+    pickBook: () => ipcRenderer.invoke('quick-pick-book'),
+    dropBook: (file) => ipcRenderer.invoke('quick-open-book', webUtils.getPathForFile(file)),
+    pickPhoto: () => ipcRenderer.invoke('quick-pick-photo'),
+    dropPhoto: (file) => ipcRenderer.invoke('quick-drop-photo', webUtils.getPathForFile(file)),
+    languages: () => ipcRenderer.invoke('quick-languages'),
+    make: (o) => ipcRenderer.invoke('quick-make', o),
+    gemini: (how) => ipcRenderer.invoke('quick-gemini', how),
+    prompt: () => ipcRenderer.invoke('quick-prompt'),
+    pickPicture: () => ipcRenderer.invoke('quick-pick-picture'),
+    dropPicture: (file) => ipcRenderer.invoke('quick-drop-picture', webUtils.getPathForFile(file)),
+    onProgress: (fn) => ipcRenderer.on('quick-progress', (_e, d) => fn(d)),
+  },
 });

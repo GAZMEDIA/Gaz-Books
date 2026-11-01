@@ -7,6 +7,26 @@ const { makeEpub } = require('./epub');
 const { makeDocx } = require('./docx');
 const { translateBook } = require('./translate');
 const { MAX_PAGES, MIN_PAGES } = require('./kdp');
+const { heading } = require('./kdp-languages');
+
+const ABOUT_AUTHOR_RE = /^about the author\b/i;
+const paragraphs = (t) => String(t || '').split(/\n\s*\n|\n/).map((x) => x.trim()).filter(Boolean);
+
+// The author's own "About the Author" page: photo (colour, plus a black-and-white
+// copy for the paperback) and their words. Added before translating, so it is
+// translated with the rest of the book.
+function authorChapter(a) {
+  const blocks = [];
+  if (a.photo) blocks.push({ type: 'img', src: a.photo, print: a.photoGrey || a.photo, scale: 0.42, alt: 'The author' });
+  for (const p of paragraphs(a.text)) blocks.push({ type: 'p', runs: [{ text: p }] });
+  return { title: 'About the Author', aboutAuthor: true, blocks };
+}
+
+// The About the Author section a manuscript already has, as plain text (to fill the form).
+function findAboutAuthor(book) {
+  const ch = book.chapters.find((c) => ABOUT_AUTHOR_RE.test(c.title || ''));
+  return ch ? ch.blocks.filter((b) => b.runs).map((b) => plain(b.runs)).join('\n\n') : '';
+}
 
 const FONT_FILES = {
   crimson: path.join(__dirname, '..', 'fonts', 'CrimsonText-Regular.ttf'),
@@ -39,7 +59,7 @@ function safeName(s) {
 async function readBook(buffer, filename) {
   const book = await readManuscript(buffer, filename);
   const words = book.chapters.reduce((n, c) => n + c.blocks.reduce((m, b) => m + (b.runs ? plain(b.runs).split(/\s+/).filter(Boolean).length : 0), 0), 0);
-  return { book, summary: { title: book.title, author: book.author, subtitle: book.subtitle, chapters: book.chapters.map((c) => c.title || '(untitled)'), words } };
+  return { book, summary: { title: book.title, author: book.author, subtitle: book.subtitle, chapters: book.chapters.map((c) => c.title || '(untitled)'), words, aboutAuthor: findAboutAuthor(book) } };
 }
 
 // opts: trim, fontSize, dropCaps, rectoChapters, toc, isbn, dedication, copyrightExtra,
@@ -55,14 +75,22 @@ async function buildAll(book, opts, onProgress = () => {}) {
   if (opts.author) b.author = opts.author;
   if (opts.subtitle !== undefined) b.subtitle = opts.subtitle;
   const notes = [];
-  let lang = opts.lang || 'en';
-  let rtl = false;
+  let lang = opts.lang || b.lang || 'en';
+  let rtl = !!b.rtl;
+  const author = opts.aboutAuthor;
+  if (author && (author.text || author.photo)) {
+    b.chapters = b.chapters.filter((c) => !ABOUT_AUTHOR_RE.test(c.title || ''));
+    b.chapters.push(authorChapter(author));
+  }
 
   if (opts.translate && opts.translate.target) {
     onProgress('Translating', 0);
     b = await translateBook(b, opts.translate, (p) => onProgress('Translating', p));
     lang = b.lang; rtl = b.rtl;
   }
+
+  for (const c of b.chapters) if (c.aboutAuthor) c.title = heading('aboutAuthor', opts.translate?.target || lang);
+  const aboutAuthorText = (b.chapters.find((c) => c.aboutAuthor) || { blocks: [] }).blocks.filter((x) => x.runs).map((x) => plain(x.runs)).join('\n\n');
 
   if (opts.beforeLayout) b = await opts.beforeLayout(b, onProgress);
 
@@ -102,7 +130,7 @@ async function buildAll(book, opts, onProgress = () => {}) {
   files.push({ name: `${base} - Word.docx`, buffer: await makeDocx(b, { ...opts, lang }, pageCount), kind: 'docx' });
   if (opts.extraFiles) files.push(...await opts.extraFiles(b, { pageCount, pdfMade, files }));
   onProgress('Done', 1);
-  return { files, pageCount, notes, font: family };
+  return { files, pageCount, notes, font: family, book: b, lang, pdfMade, aboutAuthorText };
 }
 
-module.exports = { readBook, buildAll, safeName };
+module.exports = { readBook, buildAll, safeName, findAboutAuthor, authorChapter, ABOUT_AUTHOR_RE };
