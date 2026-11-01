@@ -40,9 +40,11 @@ function gotBook(s) {
   $('bookDrop').classList.add('hidden');
   $('fTitle').textContent = s.title || 'Untitled';
   $('fBy').textContent = s.author ? `, by ${s.author}` : '';
+  $('fSub').textContent = s.subtitle ? `Subtitle: ${s.subtitle}` : '';
+  if (!s.title) $('fTitle').textContent = '(no title found: type it below)';
   $('fInfo').textContent = `${s.words.toLocaleString()} words, ${s.chapters.length} chapter${s.chapters.length === 1 ? '' : 's'} (${s.file})`;
   $('title').value = s.title || ''; $('author').value = s.author || ''; $('subtitle').value = s.subtitle || '';
-  if (!s.author) $('fixBox').classList.remove('hidden');
+  if (!s.title || !s.author) $('fixBox').classList.remove('hidden');
   $('aboutAuthor').value = s.aboutAuthorText || '';
   $('aboutBook').value = s.aboutBook || '';
   setPhoto(s.photo);
@@ -60,7 +62,14 @@ dropZone($('photoDrop'), (f) => run(() => q.dropPhoto(f)).then((p) => p && setPh
 $('fixBtn').onclick = () => $('fixBox').classList.toggle('hidden');
 $('title').oninput = () => { $('fTitle').textContent = $('title').value; };
 $('author').oninput = () => { $('fBy').textContent = $('author').value ? `, by ${$('author').value}` : ''; };
-$('next1').onclick = () => { showLanguages(); show(2); };
+$('subtitle').oninput = () => { $('fSub').textContent = $('subtitle').value ? `Subtitle: ${$('subtitle').value}` : ''; };
+$('next1').onclick = () => {
+  // a book needs its title on the cover and the spine
+  if (!$('title').value.trim()) { $('fixBox').classList.remove('hidden'); $('title').focus(); showError('Type your book\'s title first. It goes on the front cover and the spine.'); return; }
+  if (!$('author').value.trim()) { $('fixBox').classList.remove('hidden'); $('author').focus(); showError('Type the author\'s name first.'); return; }
+  showError('');
+  showLanguages(); show(2);
+};
 
 // ---------------------------------------------------------------- screen 2
 
@@ -129,6 +138,7 @@ function done(r) {
   $('notes').textContent = (r.notes || []).join(' ');
   $('notes').classList.toggle('hidden', !(r.notes || []).length);
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
+  showBack(r.back); showWrap(r);
   $('copied').classList.add('hidden'); $('geminiTip').classList.add('hidden'); $('noGemini').classList.add('hidden');
   show(3);
 }
@@ -156,11 +166,45 @@ async function picture(fn) {
   if (!r) return;
   result = r;
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
+  showWrap(r);
   $('picWarn').textContent = r.warn || `Done! The covers for all ${r.editions.length} language${r.editions.length > 1 ? 's' : ''} now use your picture.`;
   $('picWarn').className = r.warn ? 'warn' : 'success';
 }
 dropZone($('picDrop'), (f) => picture(() => q.dropPicture(f)), () => picture(() => q.pickPicture()));
 $('again').onclick = () => { book = null; result = null; $('bookFound').classList.add('hidden'); $('bookDrop').classList.remove('hidden'); show(1); };
+// ---------------------------------------------------------------- back cover
+let backPhoto = null;
+function showWrap(r) {
+  $('wrapImg').classList.toggle('hidden', !r.wrap);
+  if (r.wrap) $('wrapImg').src = r.wrap;
+}
+function showBack(b) {
+  if (!b) return;
+  $('bTag').value = b.tagline || ''; $('bDesc').value = b.desc || ''; $('bBio').value = b.bio || '';
+  backPhoto = b.photo ? { photo: b.photo, photoGrey: (photo && photo.photoGrey) || b.photo, file: photo && photo.file } : null;
+  setBackPhoto();
+}
+function setBackPhoto() {
+  $('bPhotoImg').classList.toggle('hidden', !backPhoto);
+  $('bPhotoHint').classList.toggle('hidden', !!backPhoto);
+  if (backPhoto) $('bPhotoImg').src = backPhoto.photo;
+}
+dropZone($('bPhotoDrop'), (f) => run(() => q.dropPhoto(f)).then((p) => { if (p) { backPhoto = p; setBackPhoto(); } }),
+  () => run(() => q.pickPhoto()).then((p) => { if (p) { backPhoto = p; setBackPhoto(); } }));
+$('bUpdate').onclick = async () => {
+  $('bUpdate').disabled = true; $('bStatus').textContent = 'Updating every language…';
+  const r = await run(() => q.updateBack({
+    tagline: $('bTag').value.trim(), desc: $('bDesc').value.trim(), bio: $('bBio').value.trim(),
+    photo: backPhoto && backPhoto.photo, photoGrey: backPhoto && backPhoto.photoGrey, photoFile: backPhoto && backPhoto.file,
+  }));
+  $('bUpdate').disabled = false; $('bStatus').textContent = '';
+  if (!r) return;
+  result = r;
+  if (r.kindleCover) $('coverNow').src = r.kindleCover;
+  showWrap(r);
+  $('bStatus').textContent = `Done: the back cover and About the Author page are updated in all ${r.editions.length} language${r.editions.length > 1 ? 's' : ''}.`;
+};
+
 $('gpSite').onclick = () => q.googlePlay('site');
 $('gpFolder').onclick = () => q.googlePlay('folder');
 $('studioBtn').onclick = () => window.gaz.openStudio();

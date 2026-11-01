@@ -187,11 +187,11 @@ ipcMain.handle('build', async (_e, opts) => {
   return { folder: kitFolder ? path.join(folder, kitFolder) : folder, saved, pageCount: results[0].pageCount, notes: [...new Set(results.flatMap((res) => res.notes))] };
 });
 
-const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need, aiKeys });
+const { renderCover, saveAsJpeg, previewCover } = require('./cover-main')({ getWin: () => win, getBook: () => current && current.book, loadSettings, saveSettings, need, aiKeys });
 ipcMain.handle('local-ai-ready', () => localAi.isDownloaded(modelDir()));
 
 const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
-require('./quick-main')({ getWin: () => win, loadSettings, saveSettings, need, renderCover, saveAsJpeg });
+require('./quick-main')({ getWin: () => win, loadSettings, saveSettings, need, renderCover, saveAsJpeg, previewCover });
 ipcMain.handle('open-studio', () => win.loadFile(path.join(__dirname, 'ui', 'index.html')));
 ipcMain.handle('open-quick', () => win.loadFile(path.join(__dirname, 'ui', 'quick.html')));
 app.on('before-quit', () => require('../src/fast-translate').stopWorker());

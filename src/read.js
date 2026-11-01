@@ -204,7 +204,23 @@ function htmlToBook(html) {
     const paras = first.blocks.filter((b) => b.type === 'p');
     const short = paras.length <= 6 && paras.every((p) => plain(p.runs).length < 80);
     const by = paras.find((p) => /^by\s+/i.test(plain(p.runs)));
-    if (short && (!first.title || by || paras.length <= 2)) {
+    // A fuller title page: title (often twice), subtitle, author, then publisher,
+    // address, printer and scripture-version lines. The app makes its own.
+    const words = (p) => plain(p.runs).trim().split(/\s+/).length;
+    const fullPage = !first.title && paras.length && paras.filter((p) => BOILER_RE.test(plain(p.runs))).length >= 1
+      && paras.filter((p) => words(p) <= 14 || BOILER_RE.test(plain(p.runs))).length >= paras.length * 0.7;
+    if (fullPage && !short) {
+      const lines = paras.map((p) => plain(p.runs).trim()).filter((t) => t && !BOILER_RE.test(t));
+      const same = (x, y) => x.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase() === y.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+      const title = lines.find((t) => t.split(/\s+/).length <= 14);
+      if (title && !book.title) book.title = title;
+      const rest = lines.filter((t) => !same(t, book.title) && !same(t, `${book.title}${book.subtitle}`));
+      const sub = rest.find((t) => /^(…|\.\.\.|:|–|-)/.test(t)) || rest.find((t) => t.split(/\s+/).length > 5 && t.split(/\s+/).length <= 16 && t !== t.toUpperCase());
+      if (sub && !book.subtitle) book.subtitle = sub.replace(/^(…|\.\.\.|:|–|-)\s*/, '').trim();
+      const name = rest.find((t) => t !== sub && t.split(/\s+/).length <= 5 && !/[.,:;!?]$/.test(t) && (t === t.toUpperCase() || /^by\s+/i.test(t)));
+      if (name && !book.author) book.author = titleCase(name.replace(/^by\s+/i, ''));
+      book.chapters.shift();
+    } else if (short && (!first.title || by || paras.length <= 2)) {
       if (!book.title) book.title = first.title || (paras[0] ? plain(paras[0].runs) : '');
       else if (first.title && !book.subtitle) book.subtitle = first.title;
       if (by) book.author = plain(by.runs).replace(/^by\s+/i, '');
@@ -224,6 +240,9 @@ function htmlToBook(html) {
   if (copyrightName && (!book.author || squash(book.author) === squash(copyrightName))) book.author = copyrightName;
   return book;
 }
+
+// Lines on a hand-made title or copyright page that are not the title, subtitle or author.
+const BOILER_RE = /(publish|publication|printed|printing|designed|p\.\s?o\.\s?box|\btel\b|phone|e-?mail|@|www\.|\bisbn|copyright|\u00A9|all rights|scripture|quotations?|king james|\bkjv\b|\bniv\b|\bnkjv\b|first (published|edition)|edition|reprint|\d{4,})/i;
 
 function fixCase(s) { return /^(CHAPTER|PART|BOOK)\b/.test(s) && s === s.toUpperCase() ? titleCase(s) : s; }
 
