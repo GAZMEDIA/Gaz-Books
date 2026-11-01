@@ -101,14 +101,12 @@
     <div class="cover-row">
       <img id="coverNow" alt="Your front cover now">
       <div>
-        <h3>Make your cover picture: 3 easy steps</h3>
-        <p class="hint">A picture from Gemini makes your cover beautiful. One picture works for every language. (You can skip this and keep the simple cover.)</p>
+        <h3>Let Gemini design your cover: 4 easy steps</h3>
+        <p class="hint">Gemini designs the cover for your book. GazBook then makes the same cover in every language, with the same picture, fonts and colours. (You can skip this and keep the simple cover.)</p>
         <ol class="three">
-          <li><b>1. Pick an idea for your book</b>
-            <div class="ideas" id="ideas"></div>
-            <button class="primary" id="copyPrompt">Copy this idea</button> <span class="done hidden" id="copied">Copied! Now press "2. Open Gemini".</span></li>
+          <li><button class="primary" id="copyPrompt">1. Copy the design request</button> <span class="done hidden" id="copied">Copied! Now press "2. Open Gemini".</span></li>
           <li><button class="primary" id="openGemini">2. Open Gemini</button>
-            <div class="tip hidden" id="geminiTip">In Gemini: press <b>Ctrl + V</b> to paste, then <b>Enter</b>. When the picture is ready, save it (Download).</div>
+            <div class="tip hidden" id="geminiTip">In Gemini: press <b>Ctrl + V</b> to paste, then <b>Enter</b>. Gemini gives you the cover, the same picture <b>without words</b>, and a design card. Save the picture <b>without words</b> (Download). If Gemini gives only one picture, type: <i>"Now give me the same picture with no words at all."</i></div>
             <div class="nogem hidden" id="noGemini">
               <p>The Gemini app is not on this computer.</p>
               <button class="primary" id="getGemini">Get the free Gemini app</button>
@@ -116,7 +114,11 @@
               <p class="hint">After installing, press "2. Open Gemini" again. Sign in with your Gmail.</p>
             </div>
           </li>
-          <li><div class="drop small" id="picDrop" tabindex="0" role="button" aria-label="Add the cover picture"><b>3. Put your picture here</b><br><span class="hint">drag it here or click</span></div></li>
+          <li><b>3. Paste the design card from Gemini</b> <span class="opt">(the lines starting with TITLE:, SUBTITLE:, AUTHOR:, BACK:)</span>
+            <textarea id="card" rows="5" placeholder="GAZBOOK DESIGN CARD&#10;TITLE: font=…; colour=#…; position=top …&#10;SUBTITLE: …&#10;AUTHOR: …&#10;BACK: …"></textarea>
+            <p class="hint" id="understood"></p></li>
+          <li><div class="drop small" id="picDrop" tabindex="0" role="button" aria-label="Add the picture without words"><b>4. Put the picture WITHOUT words here</b><br><span class="hint">drag it here or click</span></div>
+            <button class="ghost hidden" id="applyCard">Use the changed design card</button></li>
         </ol>
         <p class="warn hidden" id="picWarn"></p>
       </div>

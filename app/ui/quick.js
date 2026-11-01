@@ -136,6 +136,7 @@ function done(r) {
   showBack(r.back); showWrap(r); showBlanks();
   $('copied').classList.add('hidden'); $('geminiTip').classList.add('hidden'); $('noGemini').classList.add('hidden'); $('picWarn').classList.add('hidden');
   $('bStatus').textContent = ''; $('wordsCopied').classList.add('hidden');
+  $('card').value = ''; $('understood').textContent = ''; $('applyCard').classList.add('hidden');
   loadIdeas();
   show(3);
 }
@@ -165,28 +166,10 @@ function showBlanks() {
 }
 for (const id of ['bTitle', 'bAuthor', 'bSub', 'bTag', 'bDesc', 'bBio']) $(id).addEventListener('input', () => { dirty = true; showBlanks(); });
 
-// ---- the three cover ideas and the words request, built from this book
+// ---- the cover design request and the words request, built from this book
 let prompts = null;
-async function loadIdeas() {
-  prompts = await q.prompt();
-  const box = $('ideas');
-  box.innerHTML = '';
-  (prompts ? prompts.concepts : []).forEach((c, i) => {
-    const lab = document.createElement('label');
-    lab.className = `idea${i === 0 ? ' on' : ''}`;
-    lab.innerHTML = '<input type="radio" name="idea"><span><b></b><span class="hint"></span></span>';
-    lab.querySelector('b').textContent = `Idea ${i + 1}: ${c.name}`;
-    lab.querySelector('.hint').textContent = c.idea;
-    const r = lab.querySelector('input');
-    r.value = i; r.checked = i === 0;
-    r.onchange = () => { for (const x of box.children) x.classList.toggle('on', x === lab); $('copied').classList.add('hidden'); };
-    box.append(lab);
-  });
-}
-const chosenIdea = () => {
-  const r = document.querySelector('input[name=idea]:checked');
-  return prompts && prompts.concepts[r ? Number(r.value) : 0].prompt;
-};
+async function loadIdeas() { prompts = await q.prompt(); }
+const chosenIdea = () => prompts && prompts.design;
 $('copyPrompt').onclick = async () => {
   await q.copy(chosenIdea());
   $('copied').classList.remove('hidden');
@@ -210,17 +193,20 @@ $('getGemini').onclick = () => gemini('get');
 $('webGemini').onclick = () => gemini('web');
 async function picture(fn) {
   $('picWarn').classList.add('hidden');
-  $('picDrop').innerHTML = '<b>Making every cover with your picture…</b>';
+  $('picDrop').innerHTML = '<b>Making every cover with your design…</b>';
   const r = await run(fn);
-  $('picDrop').innerHTML = '<b>3. Put your picture here</b><br><span class="hint">drag it here or click</span>';
+  $('picDrop').innerHTML = '<b>4. Put the picture WITHOUT words here</b><br><span class="hint">drag it here or click</span>';
   if (!r) return;
+  $('understood').textContent = r.understood ? `GazBook read: ${r.understood}` : '';
+  $('applyCard').classList.remove('hidden');
   result = r;
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
   showWrap(r);
-  $('picWarn').textContent = r.warn || `Done! The covers for all ${r.editions.length} language${r.editions.length > 1 ? 's' : ''} now use your picture.`;
+  $('picWarn').textContent = r.warn || `Done! The covers for all ${r.editions.length} language${r.editions.length > 1 ? 's' : ''} now use ${r.understood ? 'Gemini\'s design' : 'your picture'}.`;
   $('picWarn').className = r.warn ? 'warn' : 'success';
 }
-dropZone($('picDrop'), (f) => picture(() => q.dropPicture(f)), () => picture(() => q.pickPicture()));
+dropZone($('picDrop'), (f) => picture(() => q.dropPicture(f, $('card').value)), () => picture(() => q.pickPicture($('card').value)));
+$('applyCard').onclick = () => picture(() => q.applyDesign($('card').value));
 
 // ---------------------------------------------------------------- back cover
 let backPhoto = null;

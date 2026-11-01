@@ -40,8 +40,9 @@ contextBridge.exposeInMainWorld('gaz', {
     googlePlay: (what) => ipcRenderer.invoke('quick-google-play', what),
     updateBack: (vals) => ipcRenderer.invoke('quick-update-back', vals),
     finish: () => ipcRenderer.invoke('quick-finish'),
-    pickPicture: () => ipcRenderer.invoke('quick-pick-picture'),
-    dropPicture: (file) => ipcRenderer.invoke('quick-drop-picture', webUtils.getPathForFile(file)),
+    pickPicture: (card) => ipcRenderer.invoke('quick-pick-picture', card),
+    dropPicture: (file, card) => ipcRenderer.invoke('quick-drop-picture', webUtils.getPathForFile(file), card),
+    applyDesign: (card) => ipcRenderer.invoke('quick-apply-design', card),
     onProgress: (fn) => ipcRenderer.on('quick-progress', (_e, d) => fn(d)),
   },
 });

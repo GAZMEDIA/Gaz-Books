@@ -17,8 +17,11 @@ languages) you get one folder and one zip with, for every language:
 - a "Google Play Books" folder: every language ready for Google's Partner
   Center (with ISBNs: files named by ISBN and a filled-in book list, all
   languages in one upload; without: a folder per language with the details to copy)
-- one "Cover picture prompt" to paste into Gemini; drop the picture back into
-  GazBook and every language's covers are redrawn with it
+- a cover design request for Gemini, built from the book: Gemini designs the
+  front cover using only GazBook's 22 bundled cover fonts (fonts/cover, SIL OFL)
+  and gives back the same picture with no words plus a short design card;
+  GazBook redraws that design (art, fonts, colours, places) in every language
+- a "words" request for Gemini (catchy descriptions, taglines, keywords)
 
 No keys and no fees: translation runs on the computer (`translator/`,
 CTranslate2 with free OPUS-MT and M2M100 models). Each language is
