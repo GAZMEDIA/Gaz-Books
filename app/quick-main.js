@@ -7,6 +7,7 @@ const path = require('path');
 const { readBook, safeName } = require('../src/engine');
 const { makeEverything, drawCovers, backCover, updateBack, finish, blanks } = require('../src/quick');
 const { writeGooglePlay, isbnOk, PARTNER_CENTER } = require('../src/googleplay');
+const coverDesign = require('../src/cover-design');
 const { KDP_LANGUAGES } = require('../src/kdp-languages');
 const { offlineTranslate, modelsDir } = require('./offline-main');
 const { fastLanguageCodes, getManifest } = require('../src/fast-translate');
@@ -159,8 +160,9 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     ];
     return found[0] || exes.find((e) => fs.existsSync(e)) || null;
   }
-  ipcMain.handle('quick-gemini', async (_e, how) => {
-    if (last) clipboard.writeText(last.prompt);
+  // what: the text to copy (a cover idea or the words request)
+  ipcMain.handle('quick-gemini', async (_e, how, what) => {
+    if (what) clipboard.writeText(what); else if (last) clipboard.writeText(last.prompt);
     if (how === 'web') { await shell.openExternal(GEMINI_WEB); saveSettings({ ...loadSettings(), geminiWay: 'web' }); return { opened: 'web' }; }
     if (how === 'get') { await shell.openExternal(GEMINI_APP_PAGE); return { opened: 'get' }; }
     const g = process.platform === 'win32' ? findGemini() : null;
@@ -174,32 +176,46 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
 
   // ------------------------------------------------------------ the cover picture
 
-  // The picture from Gemini: every language's covers are drawn again with it.
-  async function usePicture(file) {
-    if (!last) throw new Error('Make your books first, then add the cover picture.');
-    const ext = path.extname(file).slice(1).toLowerCase();
-    const pic = await saveAsJpeg(fs.readFileSync(file), `image/${ext === 'jpg' ? 'jpeg' : ext}`);
-    const ed0 = last.editions[0];
-    const sharpW = ed0 ? Math.round(ed0.coverSpec.size ? ed0.coverSpec.size.px.frontW : 1838) : 1838; // pixels for 300 dpi
-    const warn = pic.w < sharpW * 0.66 ? 'This picture is a little small for a sharp paperback cover. If you can, ask Gemini again and add "high resolution".' : '';
-    // the back cover takes a deep colour from the picture
-    const avg = nativeImage.createFromPath(pic.path).resize({ width: 1, height: 1, quality: 'best' }).toBitmap();
-    const dark = (v) => Math.round(v * 0.35);
-    const bg = `#${[avg[2], avg[1], avg[0]].map((v) => dark(v).toString(16).padStart(2, '0')).join('')}`;
+  // The no-words picture from Gemini (+ the design card): every language's covers
+  // are drawn with the same art, fonts, colours and places.
+  async function drawAll(card) {
+    const design = coverDesign.readCard(card);
+    const pic = last.coverPic;
+    let bg; let ink = '#ffffff';
+    if (!design) { // no card: the back takes a deep colour from the picture
+      const avg = nativeImage.createFromPath(pic.path).resize({ width: 1, height: 1, quality: 'best' }).toBitmap();
+      bg = `#${[avg[2], avg[1], avg[0]].map((v) => Math.round(v * 0.35).toString(16).padStart(2, '0')).join('')}`;
+    }
     let n = 0;
     for (const ed of last.editions) {
       send({ step: `Drawing the ${ed.name} covers`, p: n++ / last.editions.length });
-      await drawCovers(ed, renderCover, { image: pic.path, imageMode: 'front', bg, ink: '#ffffff' });
+      await drawCovers(ed, renderCover, { image: pic.path, imageMode: 'front', design: design || null, ...(design ? {} : { bg, ink }) });
     }
+    last.design = design;
     last.finished = false; // the zip is made again at "Finish my books"
     send({ step: 'Covers ready', p: 1 });
-    return withWrap({ ...summary(last), warn });
+    const sharpW = 1838; // pixels across the front for a sharp 6x9 print
+    const notes = [];
+    if (pic.w < sharpW * 0.66) notes.push('This picture is a little small for a sharp paperback cover. If you can, ask Gemini for the same picture "in high resolution".');
+    if (card && card.trim() && !design) notes.push('GazBook could not read that design card, so it used its own simple style. Paste the lines that start with TITLE:, SUBTITLE:, AUTHOR: and BACK:.');
+    for (const e of design ? [design.title, design.subtitle, design.author].filter(Boolean) : []) if (!e.fontKnown && e.asked) notes.push(`Gemini used "${e.asked}", which GazBook doesn't have; it used ${e.font}, the closest.`);
+    return withWrap({ ...summary(last), warn: notes.join(' '), understood: coverDesign.describe(design) });
   }
-  ipcMain.handle('quick-pick-picture', async () => {
-    const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your cover picture', properties: ['openFile'], filters: [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
-    return r.canceled || !r.filePaths[0] ? null : usePicture(r.filePaths[0]);
+  async function usePicture(file, card) {
+    if (!last) throw new Error('Make your books first, then add the cover picture.');
+    const ext = path.extname(file).slice(1).toLowerCase();
+    last.coverPic = await saveAsJpeg(fs.readFileSync(file), `image/${ext === 'jpg' ? 'jpeg' : ext}`);
+    return drawAll(card);
+  }
+  ipcMain.handle('quick-apply-design', (_e, card) => {
+    if (!last || !last.coverPic) throw new Error('First put in the picture WITHOUT words from Gemini (step 3).');
+    return drawAll(card);
   });
-  ipcMain.handle('quick-drop-picture', (_e, file) => usePicture(file));
+  ipcMain.handle('quick-pick-picture', async (_e, card) => {
+    const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your cover picture', properties: ['openFile'], filters: [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
+    return r.canceled || !r.filePaths[0] ? null : usePicture(r.filePaths[0], card);
+  });
+  ipcMain.handle('quick-drop-picture', (_e, file, card) => usePicture(file, card));
   // "Check your back cover": new words or photo, every language redone
   ipcMain.handle('quick-update-back', async (_e, vals) => {
     if (!last) throw new Error('Make your books first.');
@@ -223,7 +239,8 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     send({ step: 'Done', p: 1 });
     return summary(last);
   });
-  ipcMain.handle('quick-prompt', () => (last ? last.prompt : ''));
+  ipcMain.handle('quick-prompt', () => (last ? { design: last.designRequest, words: last.wordsPrompt } : null));
+  ipcMain.handle('quick-copy', (_e, text) => { clipboard.writeText(String(text || '')); return true; });
   ipcMain.handle('quick-google-play', async (_e, what) => {
     if (what === 'site') return shell.openExternal(PARTNER_CENTER);
     if (last) return shell.openPath(path.join(last.folder, 'Google Play Books'));

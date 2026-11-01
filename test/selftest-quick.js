@@ -49,12 +49,23 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const ok = await until("!document.getElementById('s3').classList.contains('hidden') || document.getElementById('error').innerText", 600);
         console.log('MADE in', ((Date.now() - t) / 1000).toFixed(1), 's', ok, await err());
         await shot('5-ready.png');
+        await wait(800);
+        await js("document.getElementById('copyPrompt').click(); 0");
+        await wait(500);
+        console.log('COPIED', JSON.stringify(require('electron').clipboard.readText().slice(0, 140)));
+        await js("document.getElementById('copyWords').click(); 0");
+        await wait(500);
+        console.log('WORDS', JSON.stringify(require('electron').clipboard.readText().slice(0, 300)));
         await js("document.getElementById('openGemini').click()");
         await wait(1500);
         await shot('6-gemini.png');
+        // a design card as Gemini writes it (with bold marks), pasted before the picture
+        await js(`card.value = ${JSON.stringify('**GAZBOOK DESIGN CARD**\n**TITLE:** font=Cinzel; weight=Bold; colour=#F2D388; position=top; align=center; case=upper; size=huge; spacing=wide; effect=glow\n**SUBTITLE:** font=Lora; style=italic; colour=#FFFFFF; size=small\n**AUTHOR:** font=Montserrat; weight=600; colour=#F2D388; position=bottom; case=upper; spacing=wide\n**BACK:** background=#14213D; text=#FFFFFF; accent=#F2D388')}; 0`);
         await js("document.getElementById('picDrop').click()");
         await until("!document.getElementById('picWarn').classList.contains('hidden') || document.getElementById('error').innerText", 120);
         await shot('7-picture.png');
+        console.log('UNDERSTOOD', await js("document.getElementById('understood').innerText"));
+        fs.writeFileSync(path.join(out, 'wrap-design.png'), Buffer.from((await js("wrapImg.src")).split(',')[1], 'base64'));
         // the back-cover editor: what GazBook wrote, then the author's own bio and photo
         console.log('BACK BEFORE', JSON.stringify(await js("({tag: bTag.value, desc: bDesc.value.slice(0, 160), bio: bBio.value, blanks: document.getElementById('blanks').innerText})")));
         await shot('7b-check-blank.png');

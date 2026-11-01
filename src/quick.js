@@ -13,6 +13,8 @@ const { translateBook, translateStrings } = require('./translate');
 const { kdpLanguage } = require('./kdp-languages');
 const kit = require('./kit-offline');
 const { writeGooglePlay } = require('./googleplay');
+const ideas = require('./book-ideas');
+const coverDesign = require('./cover-design');
 
 // The first two or three sentences (about 55 words): the bio on the back cover.
 function shortBio(text) {
@@ -67,13 +69,20 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     bio: a.text || '',
     shortBio: shortBio(a.text),
   };
-  const prompt = kit.coverPrompt(book, genre, opts.trim || '6x9');
+  // the cover design request and the "words" request, both built from this book
+  const g = kit.GENRES[genre];
+  const designRequest = coverDesign.designRequest(book, { genre: g.name, mood: g.mood, look: g.look, images: ideas.findImages(book, 3),
+    themes: ideas.themes(book, 5), trim: opts.trim || '6x9', cyrillic: langs.includes('uk') });
+  const prompt = designRequest;
+  const intro = kit.descriptionDraft(book, '', genre).split('\n\n').find((p) => p.split(' ').length > 15) || '';
+  const wordsPrompt = ideas.wordsPrompt(book, genre, kit.GENRES[genre], { introExcerpt: intro.split(/\s+/).slice(0, 60).join(' ') });
   const look = { ...LOOKS[genre], ...(opts.cover || {}) };
 
   const folder = opts.folder;
   fs.mkdirSync(folder, { recursive: true });
-  const promptFile = path.join(folder, 'Cover picture prompt (paste into Gemini).txt');
-  fs.writeFileSync(promptFile, `${prompt}\n`);
+  const promptFile = path.join(folder, 'Cover design request (paste into Gemini).txt');
+  fs.writeFileSync(promptFile, `${designRequest}\n`);
+  fs.writeFileSync(path.join(folder, 'Back cover words request (paste into Gemini).txt'), `${wordsPrompt}\n`);
 
   // translations: started one after another, each queued whole on the translator
   const tr = (target) => ({ engine: 'offline', target, language: (kdpLanguage(target) || {}).name || target, source, offline: deps.offline });
@@ -128,7 +137,7 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     report(code, `${lang.name} ready`, 1);
   }
   // the zip and the Google Play folder are made by finish(), after "Check before printing"
-  return { folder, zipPath: path.join(folder, `${safeName(book.title)}.zip`), editions, genre, isbns: opts.isbns || {}, prompt, promptFile, notes,
+  return { folder, zipPath: path.join(folder, `${safeName(book.title)}.zip`), editions, genre, isbns: opts.isbns || {}, prompt, designRequest, wordsPrompt, promptFile, notes,
     trim: opts.trim || '6x9', source, aboutAuthor: a, suggestion: kit.pullQuote(book), seconds: (Date.now() - t0) / 1000 };
 }
 
