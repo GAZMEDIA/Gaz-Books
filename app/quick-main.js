@@ -5,7 +5,7 @@ const { app, ipcMain, dialog, shell, clipboard, nativeImage } = require('electro
 const fs = require('fs');
 const path = require('path');
 const { readBook, safeName } = require('../src/engine');
-const { makeEverything, drawCovers, zipAll } = require('../src/quick');
+const { makeEverything, drawCovers, zipAll, backCover, updateBack } = require('../src/quick');
 const { writeGooglePlay, isbnOk, PARTNER_CENTER } = require('../src/googleplay');
 const { KDP_LANGUAGES } = require('../src/kdp-languages');
 const { offlineTranslate, modelsDir } = require('./offline-main');
@@ -14,7 +14,7 @@ const { fastLanguageCodes, getManifest } = require('../src/fast-translate');
 const GEMINI_APP_PAGE = 'https://gemini.google/desktop/';
 const GEMINI_WEB = 'https://gemini.google.com/app';
 
-module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, renderCover, saveAsJpeg }) {
+module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, renderCover, saveAsJpeg, previewCover }) {
   let current = null; // { book, file, summary }
   let last = null; // the last result, so the covers can be redrawn with the picture
 
@@ -115,11 +115,18 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     }, send);
     for (const c of o.languages) try { fs.writeFileSync(path.join(modelsDir(), 'ready-' + c), ''); } catch { /* not important */ }
     last = res;
-    return summary(res);
+    return withWrap(summary(res));
   });
+  // the whole paperback cover (back, spine, front) of the original, to check on screen
+  const withWrap = async (sum) => {
+    const e = last && (last.editions.find((x) => x.code === last.source) || last.editions[0]);
+    if (e && e.printMade && previewCover) sum.wrap = await previewCover(e.coverSpec).catch(() => '');
+    return sum;
+  };
   const summary = (res) => ({
     folder: res.folder, zip: res.zipPath, seconds: res.seconds, genre: res.genre, notes: res.notes,
     editions: res.editions.map((e) => ({ code: e.code, name: e.name, pages: e.pages, printMade: e.printMade, files: e.files.map((f) => path.basename(f)) })),
+    back: backCover(res),
     kindleCover: res.editions[0] ? `data:image/jpeg;base64,${fs.readFileSync(path.join(res.editions[0].dir, `${res.editions[0].base} - Kindle cover.jpg`)).toString('base64')}` : '',
   });
 
@@ -186,13 +193,27 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     fs.rmSync(last.zipPath, { force: true });
     last.zipPath = await zipAll(last.folder, path.basename(last.zipPath, '.zip'));
     send({ step: 'Covers ready', p: 1 });
-    return { ...summary(last), warn };
+    return withWrap({ ...summary(last), warn });
   }
   ipcMain.handle('quick-pick-picture', async () => {
     const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your cover picture', properties: ['openFile'], filters: [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
     return r.canceled || !r.filePaths[0] ? null : usePicture(r.filePaths[0]);
   });
   ipcMain.handle('quick-drop-picture', (_e, file) => usePicture(file));
+  // "Check your back cover": new words or photo, every language redone
+  ipcMain.handle('quick-update-back', async (_e, vals) => {
+    if (!last) throw new Error('Make your books first.');
+    await updateBack(last, vals, {
+      offline: (texts, src, tgt, onPart) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => send({ step: msg, p: -1 }), onProgress: onPart }),
+      renderCover,
+    }, send);
+    // remember the author's words for the next book
+    const s = loadSettings();
+    const key = (last.editions[0].author || '').trim().toLowerCase();
+    const remember = { ...((s.authors || {})[key] || {}), text: vals.bio, photo: vals.photoFile || ((s.authors || {})[key] || {}).photo || '' };
+    saveSettings({ ...s, authors: { ...(s.authors || {}), [key]: remember }, lastAuthor: remember });
+    return withWrap(summary(last));
+  });
   ipcMain.handle('quick-prompt', () => (last ? last.prompt : ''));
   ipcMain.handle('quick-google-play', async (_e, what) => {
     if (what === 'site') return shell.openExternal(PARTNER_CENTER);

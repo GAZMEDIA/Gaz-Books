@@ -31,6 +31,7 @@
       <div class="tick">✓</div>
       <div>
         <p class="big-line">We found: <b id="fTitle"></b><span id="fBy"></span></p>
+        <p class="hint" id="fSub"></p>
         <p class="hint" id="fInfo"></p>
       </div>
       <button class="link" id="fixBtn">Fix the title</button>
@@ -42,18 +43,18 @@
     </div>
 
     <section class="card">
-      <h2>Tell readers about you <span class="opt">(you can skip this)</span></h2>
+      <h2>About the author <span class="opt">(goes on the back cover and the last page of every book)</span></h2>
       <div class="author">
         <div class="photo" id="photoDrop" tabindex="0" role="button" aria-label="Add your photo">
           <img id="photoImg" class="hidden" alt="Your photo">
           <span id="photoHint">📷<br>Put your<br>photo here</span>
         </div>
-        <label class="grow">A few lines about yourself
+        <label class="grow">A few lines about the author
           <textarea id="aboutAuthor" rows="6" placeholder="For example: Jane is a teacher from Buea. She loves stories about…"></textarea>
         </label>
       </div>
       <p class="warn hidden" id="photoWarn"></p>
-      <label>What is your book about? <span class="opt">(for Amazon and the back cover; if you leave it empty, GazBook writes it from your book)</span>
+      <label>What is your book about? <span class="opt">(the description on the back cover and on Amazon; if you leave it empty, GazBook takes it from your Introduction)</span>
         <textarea id="aboutBook" rows="4"></textarea>
       </label>
       <p class="hint">GazBook remembers this for your next book.</p>
@@ -118,6 +119,22 @@
       </div>
     </div>
   </section>
+  <section class="card">
+    <h2>Check your back cover</h2>
+    <img id="wrapImg" class="wrap hidden" alt="Your whole paperback cover: back, spine and front">
+    <p class="hint">This is what your back cover says. Change anything, then press "Update all covers": every language is translated and redrawn.</p>
+    <label>The line at the top<input id="bTag"></label>
+    <label>The book description<textarea id="bDesc" rows="5"></textarea></label>
+    <div class="author">
+      <div class="photo" id="bPhotoDrop" tabindex="0" role="button" aria-label="Author photo">
+        <img id="bPhotoImg" class="hidden" alt="Author photo"><span id="bPhotoHint">📷<br>Author<br>photo</span>
+      </div>
+      <label class="grow">About the author<textarea id="bBio" rows="5"></textarea></label>
+    </div>
+    <button class="primary" id="bUpdate">Update all covers</button>
+    <span class="hint" id="bStatus"></span>
+  </section>
+
   <section class="card gplay">
     <h2>Sell on Google Play Books too</h2>
     <p class="hint">Every language is ready for Google Play in the folder "Google Play Books", with the eBook, the cover, the details to copy and a step-by-step guide.</p>

@@ -122,7 +122,7 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     save(`${base} - Amazon listing.txt`, kit.listingText({ lang, title: res.book.title, subtitle: res.book.subtitle, author: res.book.author, desc: w.desc, keys: w.keys, categories: kit.GENRES[genre].categories, bio: w.bio, pages: res.pageCount, printMade: pdfMade }));
     save('How to upload to Amazon.txt', kit.uploadGuide({ lang, trim: opts.trim || '6x9', pages: res.pageCount, printMade: pdfMade, aiCover: !!(opts.cover && opts.cover.image) }));
     const ed = { code, name: lang.name, dir, base, pages: res.pageCount, printMade: pdfMade, coverSpec, files,
-      title: res.book.title, subtitle: res.book.subtitle || '', author: res.book.author || '', words: w };
+      title: res.book.title, subtitle: res.book.subtitle || '', author: res.book.author || '', words: w, book: b, lang };
     if (deps.renderCover) await drawCovers(ed, deps.renderCover);
     editions.push(ed);
     report(code, `${lang.name} ready`, 1);
@@ -130,7 +130,55 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
   // every language, ready for Google Play Books too
   writeGooglePlay(folder, editions, { genre, isbns: opts.isbns || {} });
   const zipPath = await zipAll(folder, opts.zipName || safeName(book.title));
-  return { folder, zipPath, editions, genre, isbns: opts.isbns || {}, prompt, promptFile, notes, seconds: (Date.now() - t0) / 1000 };
+  return { folder, zipPath, editions, genre, isbns: opts.isbns || {}, prompt, promptFile, notes, trim: opts.trim || '6x9', source, aboutAuthor: a,
+    seconds: (Date.now() - t0) / 1000 };
+}
+
+const blurbOf = (desc) => String(desc || '').replace(/\n?Inside this book:[\s\S]*$/, '').trim() || String(desc || '');
+
+// What the back cover says now (in the original language), for the "Check your back cover" editor.
+function backCover(res) {
+  const e = res.editions.find((x) => x.code === res.source) || res.editions[0];
+  return { tagline: e.words.quote, desc: blurbOf(e.words.desc), bio: e.words.bio, photo: res.aboutAuthor.photo || '' };
+}
+
+// The author changed the back cover: translate the new words for every language,
+// redo each book's About the Author page, and redraw every cover.
+// vals: { tagline, desc, bio, photo, photoGrey }
+async function updateBack(res, vals, deps, onProgress = () => {}) {
+  res.aboutAuthor = { text: vals.bio || '', photo: vals.photo || '', photoGrey: vals.photoGrey || vals.photo || '' };
+  const list = [vals.desc || '', vals.tagline || '', vals.bio || '', shortBio(vals.bio)];
+  let n = 0;
+  for (const ed of res.editions) {
+    onProgress({ step: `Updating ${ed.name}`, p: n++ / res.editions.length });
+    const [desc, quote, bio, sbio] = ed.code === res.source ? list
+      : await translateStrings(list, { engine: 'offline', target: ed.code, language: ed.name, source: res.source, offline: deps.offline });
+    Object.assign(ed.words, { desc, quote, bio, shortBio: sbio });
+    // the About the Author page inside the books
+    const b = ed.book;
+    b.chapters = b.chapters.filter((c) => !c.aboutAuthor);
+    if (bio || vals.photo) b.chapters.push(authorChapter({ text: bio, photo: vals.photo, photoGrey: vals.photoGrey }));
+    const built = await buildAll(b, { trim: res.trim, lang: ed.code });
+    for (const f of built.files) {
+      const p = path.join(ed.dir, f.name.replace(/ \(\w+\)/, ''));
+      fs.writeFileSync(p, f.buffer);
+      if (!ed.files.includes(p)) ed.files.push(p);
+    }
+    if (built.pageCount !== ed.pages) { // a new page count means a new spine: the old cover file goes
+      const old = path.join(ed.dir, `${ed.base} - paperback cover ${res.trim} ${ed.pages}p.pdf`);
+      fs.rmSync(old, { force: true });
+      ed.files = ed.files.filter((f) => f !== old);
+      ed.pages = built.pageCount;
+    }
+    fs.writeFileSync(path.join(ed.dir, `${ed.base} - Amazon listing.txt`), kit.listingText({ lang: ed.lang, title: ed.title, subtitle: ed.subtitle, author: ed.author, desc, keys: ed.words.keys, categories: kit.GENRES[res.genre].categories, bio, pages: ed.pages, printMade: ed.printMade }));
+    Object.assign(ed.coverSpec, { tagline: quote, blurb: blurbOf(desc), bio: sbio, authorPhoto: vals.photo || '', pages: ed.pages });
+    if (deps.renderCover) await drawCovers(ed, deps.renderCover);
+  }
+  writeGooglePlay(res.folder, res.editions, { genre: res.genre, isbns: res.isbns });
+  fs.rmSync(res.zipPath, { force: true });
+  res.zipPath = await zipAll(res.folder, path.basename(res.zipPath, '.zip'));
+  onProgress({ step: 'Back cover updated', p: 1 });
+  return res;
 }
 
 // The two covers of one language: Kindle (front, JPG) and paperback (whole wrap, PDF).
@@ -166,4 +214,4 @@ async function zipAll(folder, name) {
   return zipPath;
 }
 
-module.exports = { makeEverything, drawCovers, zipAll, shortBio, LOOKS };
+module.exports = { makeEverything, drawCovers, zipAll, shortBio, LOOKS, backCover, updateBack };

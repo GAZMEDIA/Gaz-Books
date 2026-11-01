@@ -152,15 +152,26 @@ function pullQuote(book) {
 }
 
 // The author's "About the Book" if they gave one; otherwise built from the book.
+// Never from a title page, copyright page, dedication or thanks: from the
+// Introduction or Preface if there is one, otherwise the first real chapter.
+const NOT_TEXT = /(publish|publication|printed|designed|p\.\s?o\.\s?box|\btel\b|e-?mail|www\.|isbn|copyright|\u00A9|all rights|scripture quotations|first (published|edition))/i;
 function description(book, aboutBook, genre) {
   if (aboutBook && aboutBook.trim()) return aboutBook.trim();
-  const chapters = book.chapters.filter((c) => c.title && !c.aboutAuthor && !/^(about the author|acknowledg|dedication|contents|introduction|preface|foreword)/i.test(c.title));
-  const first = book.chapters.find((c) => c.blocks.some((b) => b.type === 'p'));
-  const opening = first ? first.blocks.filter((b) => b.type === 'p').map((b) => plain(b.runs)).join(' ').split(/\s+/).slice(0, 70).join(' ') : '';
-  const fiction = ['romance', 'thriller', 'fantasy', 'children'].includes(genre);
+  const skip = /^(about the author|acknowledg|dedication|contents|copyright|title page|also by|books by)/i;
+  const chapters = book.chapters.filter((c) => c.title && !c.aboutAuthor && !skip.test(c.title) && !/^(introduction|preface|foreword|prologue)/i.test(c.title));
+  const usable = (c) => !c.aboutAuthor && !skip.test(c.title || '') && c.blocks.some((b) => b.type === 'p' && plain(b.runs).split(/\s+/).length > 12 && !NOT_TEXT.test(plain(b.runs)));
+  const from = book.chapters.find((c) => /^(introduction|preface|foreword|prologue)/i.test(c.title || '') && usable(c)) || book.chapters.find(usable);
+  let opening = '';
+  if (from) {
+    const text = from.blocks.filter((b) => b.type === 'p' && !NOT_TEXT.test(plain(b.runs))).map((b) => plain(b.runs)).join(' ');
+    // about 90 words, ending at a full stop
+    const sent = text.split(/(?<=[.!?])\s+/);
+    for (const x of sent) { if (opening && (opening + x).split(/\s+/).length > 90) break; opening = opening ? `${opening} ${x}` : x; }
+  }
+  const fiction = ['romance', 'thriller', 'fantasy', 'children', 'fiction'].includes(genre);
   const lines = [];
   if (book.subtitle) lines.push(book.subtitle.trim().replace(/[.]*$/, '.'));
-  if (opening) lines.push(`${opening.replace(/[,;:]?$/, '')}…`);
+  if (opening) lines.push(opening);
   if (!fiction && chapters.length > 1) lines.push(`Inside this book:\n${chapters.slice(0, 10).map((c) => `• ${c.title}`).join('\n')}`);
   return lines.join('\n\n');
 }
