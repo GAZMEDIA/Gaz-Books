@@ -44,7 +44,6 @@ function gotBook(s) {
   if (!s.title) $('fTitle').textContent = '(no title found: type it below)';
   $('fInfo').textContent = `${s.words.toLocaleString()} words, ${s.chapters.length} chapter${s.chapters.length === 1 ? '' : 's'} (${s.file})`;
   $('title').value = s.title || ''; $('author').value = s.author || ''; $('subtitle').value = s.subtitle || '';
-  if (!s.title || !s.author) $('fixBox').classList.remove('hidden');
   $('aboutAuthor').value = s.aboutAuthorText || '';
   $('aboutBook').value = s.aboutBook || '';
   setPhoto(s.photo);
@@ -59,14 +58,13 @@ function setPhoto(p) {
 }
 dropZone($('bookDrop'), (f) => run(() => q.dropBook(f)).then(gotBook), () => run(() => q.pickBook()).then(gotBook));
 dropZone($('photoDrop'), (f) => run(() => q.dropPhoto(f)).then((p) => p && setPhoto(p)), () => run(() => q.pickPhoto()).then((p) => p && setPhoto(p)));
-$('fixBtn').onclick = () => $('fixBox').classList.toggle('hidden');
 $('title').oninput = () => { $('fTitle').textContent = $('title').value; };
 $('author').oninput = () => { $('fBy').textContent = $('author').value ? `, by ${$('author').value}` : ''; };
 $('subtitle').oninput = () => { $('fSub').textContent = $('subtitle').value ? `Subtitle: ${$('subtitle').value}` : ''; };
 $('next1').onclick = () => {
   // a book needs its title on the cover and the spine
-  if (!$('title').value.trim()) { $('fixBox').classList.remove('hidden'); $('title').focus(); showError('Type your book\'s title first. It goes on the front cover and the spine.'); return; }
-  if (!$('author').value.trim()) { $('fixBox').classList.remove('hidden'); $('author').focus(); showError('Type the author\'s name first.'); return; }
+  if (!$('title').value.trim()) { $('title').focus(); showError('Type your book\'s title first. It goes on the front cover and the spine.'); return; }
+  if (!$('author').value.trim()) { $('author').focus(); showError('Type the author\'s name first.'); return; }
   showError('');
   showLanguages(); show(2);
 };
@@ -145,6 +143,8 @@ $('back3').onclick = () => show(2);
 // What is still empty, at the top and beside each box.
 function emptyList() {
   const out = [];
+  if (!$('bTitle').value.trim()) out.push('The book title is empty (front cover and spine).');
+  if (!$('bAuthor').value.trim()) out.push('The author\'s name is empty (front cover and spine).');
   if (!$('bDesc').value.trim()) out.push('The book description is empty (back cover and Amazon).');
   if (!$('bBio').value.trim()) out.push('"About the author" is empty (back cover and the last page of the book).');
   if (!backPhoto) out.push('There is no author photo.');
@@ -152,7 +152,7 @@ function emptyList() {
   return out;
 }
 function showBlanks() {
-  for (const id of ['bTag', 'bDesc', 'bBio']) {
+  for (const id of ['bTitle', 'bAuthor', 'bTag', 'bDesc', 'bBio']) {
     const empty = !$(id).value.trim();
     $(id).classList.toggle('missing', empty);
     document.querySelector(`.empty[data-for=${id}]`).classList.toggle('hidden', !empty);
@@ -162,7 +162,7 @@ function showBlanks() {
   $('blanks').classList.toggle('hidden', !list.length);
   $('blanks').innerHTML = list.length ? `<b>⚠ Still empty — fill these in before you finish:</b><ul>${list.map((x) => `<li>${x}</li>`).join('')}</ul>` : '';
 }
-for (const id of ['bTag', 'bDesc', 'bBio']) $(id).addEventListener('input', () => { dirty = true; showBlanks(); });
+for (const id of ['bTitle', 'bAuthor', 'bSub', 'bTag', 'bDesc', 'bBio']) $(id).addEventListener('input', () => { dirty = true; showBlanks(); });
 
 $('copyPrompt').onclick = async () => {
   const p = await q.prompt();
@@ -202,6 +202,7 @@ function showWrap(r) {
 }
 function showBack(b) {
   if (!b) return;
+  $('bTitle').value = b.title || ''; $('bSub').value = b.subtitle || ''; $('bAuthor').value = b.author || '';
   $('bTag').value = b.tagline || ''; $('bDesc').value = b.desc || ''; $('bBio').value = b.bio || '';
   suggestion = b.suggestion || '';
   $('suggest').classList.toggle('hidden', !suggestion);
@@ -225,6 +226,7 @@ async function applyBack() {
   $('bUpdate').disabled = true; $('finishBtn').disabled = true;
   $('bStatus').textContent = 'Updating every language…';
   const r = await run(() => q.updateBack({
+    title: $('bTitle').value.trim(), subtitle: $('bSub').value.trim(), author: $('bAuthor').value.trim(),
     tagline: $('bTag').value.trim(), desc: $('bDesc').value.trim(), bio: $('bBio').value.trim(),
     photo: backPhoto && backPhoto.photo, photoGrey: backPhoto && backPhoto.photoGrey, photoFile: backPhoto && backPhoto.file,
   }));
@@ -234,6 +236,7 @@ async function applyBack() {
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
   showWrap(r);
   $('bStatus').textContent = 'Done: see the cover above. Every language is updated.';
+  showError('');
   return true;
 }
 $('bUpdate').onclick = applyBack;
@@ -241,6 +244,7 @@ $('bUpdate').onclick = applyBack;
 // ---------------------------------------------------------------- finish → screen 4
 
 $('finishBtn').onclick = async () => {
+  if (!$('bTitle').value.trim() || !$('bAuthor').value.trim()) { showError('Type the book title and the author\'s name: they go on the front cover and the spine.'); $(!$('bTitle').value.trim() ? 'bTitle' : 'bAuthor').focus(); return; }
   const list = emptyList().filter((x) => !/optional/.test(x));
   if (list.length && !confirm(`These are still empty:\n\n• ${list.join('\n• ')}\n\nFinish anyway? (Press Cancel to fill them in.)`)) return;
   if (dirty && !(await applyBack())) return;

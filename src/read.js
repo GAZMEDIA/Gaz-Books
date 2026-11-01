@@ -209,7 +209,7 @@ function htmlToBook(html) {
     const words = (p) => plain(p.runs).trim().split(/\s+/).length;
     const fullPage = !first.title && paras.length && paras.filter((p) => BOILER_RE.test(plain(p.runs))).length >= 1
       && paras.filter((p) => words(p) <= 14 || BOILER_RE.test(plain(p.runs))).length >= paras.length * 0.7;
-    if (fullPage && !short) {
+    if (fullPage) {
       const lines = paras.map((p) => plain(p.runs).trim()).filter((t) => t && !BOILER_RE.test(t));
       const same = (x, y) => x.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase() === y.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
       const title = lines.find((t) => t.split(/\s+/).length <= 14);
@@ -217,15 +217,15 @@ function htmlToBook(html) {
       const rest = lines.filter((t) => !same(t, book.title) && !same(t, `${book.title}${book.subtitle}`));
       const sub = rest.find((t) => /^(…|\.\.\.|:|–|-)/.test(t)) || rest.find((t) => t.split(/\s+/).length > 5 && t.split(/\s+/).length <= 16 && t !== t.toUpperCase());
       if (sub && !book.subtitle) book.subtitle = sub.replace(/^(…|\.\.\.|:|–|-)\s*/, '').trim();
-      const name = rest.find((t) => t !== sub && t.split(/\s+/).length <= 5 && !/[.,:;!?]$/.test(t) && (t === t.toUpperCase() || /^by\s+/i.test(t)));
-      if (name && !book.author) book.author = titleCase(name.replace(/^by\s+/i, ''));
+      const name = rest.find((t) => /^by\s+/i.test(t)) || rest.find((t) => t !== sub && looksLikeName(t) && !inTitle(t, book));
+      if (name && !book.author) { const n = name.replace(/^by\s+/i, '').trim(); book.author = n === n.toUpperCase() ? titleCase(n) : n; }
       book.chapters.shift();
     } else if (short && (!first.title || by || paras.length <= 2)) {
       if (!book.title) book.title = first.title || (paras[0] ? plain(paras[0].runs) : '');
       else if (first.title && !book.subtitle) book.subtitle = first.title;
       if (by) book.author = plain(by.runs).replace(/^by\s+/i, '');
       else {
-        const name = paras.find((p) => plain(p.runs) !== book.title && plain(p.runs).split(/\s+/).length <= 5);
+        const name = paras.find((p) => plain(p.runs) !== book.title && looksLikeName(plain(p.runs)) && !inTitle(plain(p.runs), book));
         if (name) book.author = titleCase(plain(name.runs));
       }
       book.chapters.shift();
@@ -239,6 +239,23 @@ function htmlToBook(html) {
   const squash = (x) => x.replace(/\s/g, '').toLowerCase();
   if (copyrightName && (!book.author || squash(book.author) === squash(copyrightName))) book.author = copyrightName;
   return book;
+}
+
+// A line whose words all come from the title or subtitle ("COMING FROM" on a
+// title set over two lines) is part of the title, never the author's name.
+function inTitle(line, book) {
+  const t = new Set(`${book.title || ''} ${book.subtitle || ''}`.toLowerCase().match(/\p{L}+/gu) || []);
+  const w = line.toLowerCase().match(/\p{L}+/gu) || [];
+  return w.length > 0 && w.every((x) => t.has(x));
+}
+
+// A person's name: 2 to 5 words, each starting with a capital letter, maybe with
+// a title or degree ("Dr. Noble Nnakenyi", "NOBLE NNAKENYI", "Noble Nnakenyi, PhD").
+function looksLikeName(line) {
+  const t = String(line).trim().replace(/^(by|dr\.?|prof\.?|rev\.?|pastor|engr\.?|apostle|bishop)\s+/i, '')
+    .replace(/,?\s*(ph\.?\s?d\.?|m\.?d\.?|d\.?d\.?|jnr\.?|jr\.?|snr\.?|sr\.?)$/i, '').trim();
+  const w = t.split(/\s+/);
+  return w.length >= 2 && w.length <= 5 && !/[\d:;!?…]|\.\.\./.test(t) && w.every((x) => /^\p{Lu}[\p{L}'’.-]*$/u.test(x));
 }
 
 // Lines on a hand-made title or copyright page that are not the title, subtitle or author.

@@ -34,11 +34,12 @@
         <p class="hint" id="fSub"></p>
         <p class="hint" id="fInfo"></p>
       </div>
-      <button class="link" id="fixBtn">Fix the title</button>
+
     </div>
-    <div id="fixBox" class="hidden grid2">
+    <p class="hint">Check these three: they go on the front cover and the spine.</p>
+    <div id="fixBox" class="grid2">
       <label>Book title<input id="title"></label>
-      <label>Author name<input id="author"></label>
+      <label>Author's name<input id="author" placeholder="As it should appear on the cover, e.g. Dr. Noble Nnakenyi"></label>
       <label class="span2">Subtitle (you can leave it empty)<input id="subtitle"></label>
     </div>
 
@@ -118,6 +119,16 @@
         <p class="warn hidden" id="picWarn"></p>
       </div>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>Words on your front cover and spine</h2>
+    <div class="grid2">
+      <label>Book title<span class="empty hidden" data-for="bTitle">⚠ Empty</span><input id="bTitle"></label>
+      <label>Author's name<span class="empty hidden" data-for="bAuthor">⚠ Empty</span><input id="bAuthor" placeholder="e.g. Dr. Noble Nnakenyi"></label>
+      <label class="span2">Subtitle <span class="opt">(optional)</span><input id="bSub"></label>
+    </div>
+    <p class="hint">Translated editions get the title and subtitle in their own language; the author's name stays the same in every language.</p>
   </section>
 
   <section class="card">
