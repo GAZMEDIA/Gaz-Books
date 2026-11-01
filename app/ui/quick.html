@@ -104,7 +104,9 @@
         <h3>Make your cover picture: 3 easy steps</h3>
         <p class="hint">A picture from Gemini makes your cover beautiful. One picture works for every language. (You can skip this and keep the simple cover.)</p>
         <ol class="three">
-          <li><button class="primary" id="copyPrompt">1. Copy cover instructions</button> <span class="done hidden" id="copied">Done! Now press the next button.</span></li>
+          <li><b>1. Pick an idea for your book</b>
+            <div class="ideas" id="ideas"></div>
+            <button class="primary" id="copyPrompt">Copy this idea</button> <span class="done hidden" id="copied">Copied! Now press "2. Open Gemini".</span></li>
           <li><button class="primary" id="openGemini">2. Open Gemini</button>
             <div class="tip hidden" id="geminiTip">In Gemini: press <b>Ctrl + V</b> to paste, then <b>Enter</b>. When the picture is ready, save it (Download).</div>
             <div class="nogem hidden" id="noGemini">
@@ -133,6 +135,13 @@
 
   <section class="card">
     <h2>Your back cover</h2>
+    <div class="helper">
+      <b>Want catchy words? Let Gemini write them.</b>
+      <p class="hint">GazBook has written a request from your book: its themes, chapters and opening. Gemini gives you 3 descriptions, 5 top lines and 7 Amazon keywords. Paste the ones you like into the boxes below.</p>
+      <button class="primary" id="copyWords">Copy the words request</button>
+      <button class="ghost" id="wordsGemini">Open Gemini</button>
+      <span class="done hidden" id="wordsCopied">Copied! In Gemini press Ctrl + V, then Enter.</span>
+    </div>
     <p class="hint">Type what should be on the back. Empty boxes stay empty on the cover. Press "Show the changes" to see them on the cover above; every language is translated and redrawn.</p>
     <label>The line at the top <span class="opt">(optional)</span><span class="empty hidden" data-for="bTag">⚠ Empty</span>
       <input id="bTag" placeholder="A short, strong line, for example a quote from your book">

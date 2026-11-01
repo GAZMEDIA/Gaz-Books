@@ -135,7 +135,8 @@ function done(r) {
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
   showBack(r.back); showWrap(r); showBlanks();
   $('copied').classList.add('hidden'); $('geminiTip').classList.add('hidden'); $('noGemini').classList.add('hidden'); $('picWarn').classList.add('hidden');
-  $('bStatus').textContent = '';
+  $('bStatus').textContent = ''; $('wordsCopied').classList.add('hidden');
+  loadIdeas();
   show(3);
 }
 $('back3').onclick = () => show(2);
@@ -164,13 +165,41 @@ function showBlanks() {
 }
 for (const id of ['bTitle', 'bAuthor', 'bSub', 'bTag', 'bDesc', 'bBio']) $(id).addEventListener('input', () => { dirty = true; showBlanks(); });
 
+// ---- the three cover ideas and the words request, built from this book
+let prompts = null;
+async function loadIdeas() {
+  prompts = await q.prompt();
+  const box = $('ideas');
+  box.innerHTML = '';
+  (prompts ? prompts.concepts : []).forEach((c, i) => {
+    const lab = document.createElement('label');
+    lab.className = `idea${i === 0 ? ' on' : ''}`;
+    lab.innerHTML = '<input type="radio" name="idea"><span><b></b><span class="hint"></span></span>';
+    lab.querySelector('b').textContent = `Idea ${i + 1}: ${c.name}`;
+    lab.querySelector('.hint').textContent = c.idea;
+    const r = lab.querySelector('input');
+    r.value = i; r.checked = i === 0;
+    r.onchange = () => { for (const x of box.children) x.classList.toggle('on', x === lab); $('copied').classList.add('hidden'); };
+    box.append(lab);
+  });
+}
+const chosenIdea = () => {
+  const r = document.querySelector('input[name=idea]:checked');
+  return prompts && prompts.concepts[r ? Number(r.value) : 0].prompt;
+};
 $('copyPrompt').onclick = async () => {
-  const p = await q.prompt();
-  await navigator.clipboard.writeText(p).catch(() => {});
+  await q.copy(chosenIdea());
   $('copied').classList.remove('hidden');
 };
+$('copyWords').onclick = async () => { await q.copy(prompts && prompts.words); $('wordsCopied').classList.remove('hidden'); };
+$('wordsGemini').onclick = async () => {
+  const r = await run(() => q.gemini(undefined, prompts && prompts.words));
+  $('wordsCopied').classList.remove('hidden');
+  if (r && r.opened === null) { $('noGemini').classList.remove('hidden'); $('noGemini').scrollIntoView({ block: 'center' }); }
+};
+let geminiText = null;
 async function gemini(how) {
-  const r = await run(() => q.gemini(how));
+  const r = await run(() => q.gemini(how, geminiText || chosenIdea()));
   if (!r) return;
   $('copied').classList.remove('hidden');
   if (r.opened === 'app' || r.opened === 'web') { $('geminiTip').classList.remove('hidden'); $('noGemini').classList.add('hidden'); }

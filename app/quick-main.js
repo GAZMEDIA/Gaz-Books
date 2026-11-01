@@ -159,8 +159,9 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     ];
     return found[0] || exes.find((e) => fs.existsSync(e)) || null;
   }
-  ipcMain.handle('quick-gemini', async (_e, how) => {
-    if (last) clipboard.writeText(last.prompt);
+  // what: the text to copy (a cover idea or the words request)
+  ipcMain.handle('quick-gemini', async (_e, how, what) => {
+    if (what) clipboard.writeText(what); else if (last) clipboard.writeText(last.prompt);
     if (how === 'web') { await shell.openExternal(GEMINI_WEB); saveSettings({ ...loadSettings(), geminiWay: 'web' }); return { opened: 'web' }; }
     if (how === 'get') { await shell.openExternal(GEMINI_APP_PAGE); return { opened: 'get' }; }
     const g = process.platform === 'win32' ? findGemini() : null;
@@ -223,7 +224,8 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     send({ step: 'Done', p: 1 });
     return summary(last);
   });
-  ipcMain.handle('quick-prompt', () => (last ? last.prompt : ''));
+  ipcMain.handle('quick-prompt', () => (last ? { concepts: last.concepts, words: last.wordsPrompt } : null));
+  ipcMain.handle('quick-copy', (_e, text) => { clipboard.writeText(String(text || '')); return true; });
   ipcMain.handle('quick-google-play', async (_e, what) => {
     if (what === 'site') return shell.openExternal(PARTNER_CENTER);
     if (last) return shell.openPath(path.join(last.folder, 'Google Play Books'));
