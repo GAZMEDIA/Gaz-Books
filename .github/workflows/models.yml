@@ -6,6 +6,10 @@ name: Build translator files
 # of this repository, where GazBook downloads each language the first time
 # it is used. Nothing here costs money.
 on:
+  # also runs by itself when the list of models changes
+  push:
+    branches: ['claude/**', main]
+    paths: ['translator/build_models.py', '.github/workflows/models.yml']
   workflow_dispatch:
     inputs:
       only:
@@ -15,6 +19,11 @@ on:
 
 permissions:
   contents: write
+
+# one build at a time; a newer one replaces an older one still running
+concurrency:
+  group: translator-files
+  cancel-in-progress: true
 
 jobs:
   models:
