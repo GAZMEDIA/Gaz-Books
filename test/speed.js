@@ -57,13 +57,14 @@ function bookText(words) {
   console.log(`Translators ready after ${lap()}`);
 
   // 3. the timed part: the whole one-click job (English + every language, all files, zip)
-  const { makeEverything } = require('../src/quick');
+  const { makeEverything, finish } = require('../src/quick');
   const start = Date.now();
   const out = path.join(work, 'out');
   const res = await makeEverything(book, {
     languages: ['en', ...langs], trim: '6x9', folder: out,
     aboutAuthor: { text: 'Jones Jnr is a writer from Limbe. He writes about rivers, rain and the people who live beside them.\n\nHe has five children.' },
   }, { offline: (texts, src, tgt, onPart) => offlineTranslate(texts, src, tgt, { cacheDir: modelsDir, onProgress: onPart }) });
+  await finish(res); // Google Play folder and the zip, as "Finish my books" does
   let failed = false;
   for (const e of res.editions) {
     const kinds = e.files.map((f) => path.basename(f).split(' - ').pop());

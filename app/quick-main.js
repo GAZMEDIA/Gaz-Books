@@ -5,7 +5,7 @@ const { app, ipcMain, dialog, shell, clipboard, nativeImage } = require('electro
 const fs = require('fs');
 const path = require('path');
 const { readBook, safeName } = require('../src/engine');
-const { makeEverything, drawCovers, zipAll, backCover, updateBack } = require('../src/quick');
+const { makeEverything, drawCovers, backCover, updateBack, finish, blanks } = require('../src/quick');
 const { writeGooglePlay, isbnOk, PARTNER_CENTER } = require('../src/googleplay');
 const { KDP_LANGUAGES } = require('../src/kdp-languages');
 const { offlineTranslate, modelsDir } = require('./offline-main');
@@ -127,6 +127,8 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     folder: res.folder, zip: res.zipPath, seconds: res.seconds, genre: res.genre, notes: res.notes,
     editions: res.editions.map((e) => ({ code: e.code, name: e.name, pages: e.pages, printMade: e.printMade, files: e.files.map((f) => path.basename(f)) })),
     back: backCover(res),
+    blanks: blanks(res),
+    finished: !!res.finished,
     kindleCover: res.editions[0] ? `data:image/jpeg;base64,${fs.readFileSync(path.join(res.editions[0].dir, `${res.editions[0].base} - Kindle cover.jpg`)).toString('base64')}` : '',
   });
 
@@ -189,9 +191,7 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
       send({ step: `Drawing the ${ed.name} covers`, p: n++ / last.editions.length });
       await drawCovers(ed, renderCover, { image: pic.path, imageMode: 'front', bg, ink: '#ffffff' });
     }
-    writeGooglePlay(last.folder, last.editions, { genre: last.genre, isbns: last.isbns }); // the new covers there too
-    fs.rmSync(last.zipPath, { force: true });
-    last.zipPath = await zipAll(last.folder, path.basename(last.zipPath, '.zip'));
+    last.finished = false; // the zip is made again at "Finish my books"
     send({ step: 'Covers ready', p: 1 });
     return withWrap({ ...summary(last), warn });
   }
@@ -203,6 +203,7 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
   // "Check your back cover": new words or photo, every language redone
   ipcMain.handle('quick-update-back', async (_e, vals) => {
     if (!last) throw new Error('Make your books first.');
+    last.finished = false;
     await updateBack(last, vals, {
       offline: (texts, src, tgt, onPart) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => send({ step: msg, p: -1 }), onProgress: onPart }),
       renderCover,
@@ -213,6 +214,14 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     const remember = { ...((s.authors || {})[key] || {}), text: vals.bio, photo: vals.photoFile || ((s.authors || {})[key] || {}).photo || '' };
     saveSettings({ ...s, authors: { ...(s.authors || {}), [key]: remember }, lastAuthor: remember });
     return withWrap(summary(last));
+  });
+  // the last stage: Google Play folder and the zip
+  ipcMain.handle('quick-finish', async () => {
+    if (!last) throw new Error('Make your books first.');
+    send({ step: 'Putting everything in one zip file', p: 0.5 });
+    await finish(last);
+    send({ step: 'Done', p: 1 });
+    return summary(last);
   });
   ipcMain.handle('quick-prompt', () => (last ? last.prompt : ''));
   ipcMain.handle('quick-google-play', async (_e, what) => {

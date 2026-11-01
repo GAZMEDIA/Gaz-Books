@@ -63,7 +63,7 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
   const words = {
     desc: kit.description(book, opts.aboutBook, genre),
     keys: kit.keywords(book, genre),
-    quote: kit.pullQuote(book),
+    quote: opts.tagline || '', // empty unless the author gives one (a line from the book is offered as a suggestion)
     bio: a.text || '',
     shortBio: shortBio(a.text),
   };
@@ -127,11 +127,29 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     editions.push(ed);
     report(code, `${lang.name} ready`, 1);
   }
-  // every language, ready for Google Play Books too
-  writeGooglePlay(folder, editions, { genre, isbns: opts.isbns || {} });
-  const zipPath = await zipAll(folder, opts.zipName || safeName(book.title));
-  return { folder, zipPath, editions, genre, isbns: opts.isbns || {}, prompt, promptFile, notes, trim: opts.trim || '6x9', source, aboutAuthor: a,
-    seconds: (Date.now() - t0) / 1000 };
+  // the zip and the Google Play folder are made by finish(), after "Check before printing"
+  return { folder, zipPath: path.join(folder, `${safeName(book.title)}.zip`), editions, genre, isbns: opts.isbns || {}, prompt, promptFile, notes,
+    trim: opts.trim || '6x9', source, aboutAuthor: a, suggestion: kit.pullQuote(book), seconds: (Date.now() - t0) / 1000 };
+}
+
+// The last stage: every language ready for Google Play too, and everything in one zip.
+async function finish(res) {
+  writeGooglePlay(res.folder, res.editions, { genre: res.genre, isbns: res.isbns });
+  fs.rmSync(res.zipPath, { force: true });
+  res.zipPath = await zipAll(res.folder, path.basename(res.zipPath, '.zip'));
+  res.finished = true;
+  return res;
+}
+
+// What is still empty on the back cover, in plain words.
+function blanks(res) {
+  const b = backCover(res);
+  const out = [];
+  if (!b.desc) out.push('The book description is empty (it goes on the back cover and on Amazon).');
+  if (!b.bio) out.push('"About the author" is empty (back cover and the last page of the book).');
+  if (!b.photo) out.push('There is no author photo.');
+  if (!b.tagline) out.push('The line at the top of the back cover is empty (you can leave this one out).');
+  return out;
 }
 
 const blurbOf = (desc) => String(desc || '').replace(/\n?Inside this book:[\s\S]*$/, '').trim() || String(desc || '');
@@ -139,7 +157,7 @@ const blurbOf = (desc) => String(desc || '').replace(/\n?Inside this book:[\s\S]
 // What the back cover says now (in the original language), for the "Check your back cover" editor.
 function backCover(res) {
   const e = res.editions.find((x) => x.code === res.source) || res.editions[0];
-  return { tagline: e.words.quote, desc: blurbOf(e.words.desc), bio: e.words.bio, photo: res.aboutAuthor.photo || '' };
+  return { tagline: e.words.quote, desc: blurbOf(e.words.desc), bio: e.words.bio, photo: res.aboutAuthor.photo || '', suggestion: res.suggestion || '' };
 }
 
 // The author changed the back cover: translate the new words for every language,
@@ -151,7 +169,7 @@ async function updateBack(res, vals, deps, onProgress = () => {}) {
   let n = 0;
   for (const ed of res.editions) {
     onProgress({ step: `Updating ${ed.name}`, p: n++ / res.editions.length });
-    const [desc, quote, bio, sbio] = ed.code === res.source ? list
+    const [desc, quote, bio, sbio] = ed.code === res.source || !list.some(Boolean) ? list
       : await translateStrings(list, { engine: 'offline', target: ed.code, language: ed.name, source: res.source, offline: deps.offline });
     Object.assign(ed.words, { desc, quote, bio, shortBio: sbio });
     // the About the Author page inside the books
@@ -174,9 +192,6 @@ async function updateBack(res, vals, deps, onProgress = () => {}) {
     Object.assign(ed.coverSpec, { tagline: quote, blurb: blurbOf(desc), bio: sbio, authorPhoto: vals.photo || '', pages: ed.pages });
     if (deps.renderCover) await drawCovers(ed, deps.renderCover);
   }
-  writeGooglePlay(res.folder, res.editions, { genre: res.genre, isbns: res.isbns });
-  fs.rmSync(res.zipPath, { force: true });
-  res.zipPath = await zipAll(res.folder, path.basename(res.zipPath, '.zip'));
   onProgress({ step: 'Back cover updated', p: 1 });
   return res;
 }
@@ -214,4 +229,4 @@ async function zipAll(folder, name) {
   return zipPath;
 }
 
-module.exports = { makeEverything, drawCovers, zipAll, shortBio, LOOKS, backCover, updateBack };
+module.exports = { makeEverything, drawCovers, zipAll, shortBio, LOOKS, backCover, updateBack, finish, blanks };

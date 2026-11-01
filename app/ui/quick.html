@@ -10,7 +10,7 @@
 <header>
   <div class="brand"><img class="logo" src="../icon.png" alt=""> GazBook</div>
   <div class="steps" aria-label="Steps">
-    <span class="dot on" id="dot1">1 Your book</span><span class="dot" id="dot2">2 Languages</span><span class="dot" id="dot3">3 Ready</span>
+    <span class="dot on" id="dot1">1 Your book</span><span class="dot" id="dot2">2 Languages</span><span class="dot" id="dot3">3 Check</span><span class="dot" id="dot4">4 Download</span>
   </div>
   <button class="link" id="studioBtn" title="All the tools: AI checks, cover studio, settings and your plan">More tools</button>
 </header>
@@ -54,7 +54,7 @@
         </label>
       </div>
       <p class="warn hidden" id="photoWarn"></p>
-      <label>What is your book about? <span class="opt">(the description on the back cover and on Amazon; if you leave it empty, GazBook takes it from your Introduction)</span>
+      <label>What is your book about? <span class="opt">(the description on the back cover and on Amazon; you can also write it later, at "Check before printing")</span>
         <textarea id="aboutBook" rows="4"></textarea>
       </label>
       <p class="hint">GazBook remembers this for your next book.</p>
@@ -88,20 +88,20 @@
   </div>
 </main>
 
-<!-- ============ Screen 3: ready ============ -->
+<!-- ============ Screen 3: check before printing ============ -->
 <main id="s3" class="screen hidden">
-  <h1>Your books are ready! 🎉</h1>
-  <p class="hint" id="doneInfo"></p>
-  <button class="primary huge" id="openBtn">Open my books</button>
-  <ul class="editions" id="editions"></ul>
-  <p class="warn hidden" id="notes"></p>
+  <h1>Check before printing</h1>
+  <p class="hint" id="madeInfo"></p>
+  <div class="blanks hidden" id="blanks"></div>
 
-  <section class="card cover">
+  <section class="card">
+    <h2>Your cover</h2>
+    <img id="wrapImg" class="wrap hidden" alt="Your whole paperback cover: back, spine and front">
     <div class="cover-row">
-      <img id="coverNow" alt="Your cover now">
+      <img id="coverNow" alt="Your front cover now">
       <div>
-        <h2>Now let's make your cover picture: 3 easy steps</h2>
-        <p class="hint">Right now your books have a simple cover. A picture from Gemini makes it beautiful, and one picture works for every language.</p>
+        <h3>Make your cover picture: 3 easy steps</h3>
+        <p class="hint">A picture from Gemini makes your cover beautiful. One picture works for every language. (You can skip this and keep the simple cover.)</p>
         <ol class="three">
           <li><button class="primary" id="copyPrompt">1. Copy cover instructions</button> <span class="done hidden" id="copied">Done! Now press the next button.</span></li>
           <li><button class="primary" id="openGemini">2. Open Gemini</button>
@@ -119,28 +119,49 @@
       </div>
     </div>
   </section>
+
   <section class="card">
-    <h2>Check your back cover</h2>
-    <img id="wrapImg" class="wrap hidden" alt="Your whole paperback cover: back, spine and front">
-    <p class="hint">This is what your back cover says. Change anything, then press "Update all covers": every language is translated and redrawn.</p>
-    <label>The line at the top<input id="bTag"></label>
-    <label>The book description<textarea id="bDesc" rows="5"></textarea></label>
+    <h2>Your back cover</h2>
+    <p class="hint">Type what should be on the back. Empty boxes stay empty on the cover. Press "Show the changes" to see them on the cover above; every language is translated and redrawn.</p>
+    <label>The line at the top <span class="opt">(optional)</span><span class="empty hidden" data-for="bTag">⚠ Empty</span>
+      <input id="bTag" placeholder="A short, strong line, for example a quote from your book">
+    </label>
+    <button class="link" id="suggest">Suggest a line from my book</button>
+    <label>The book description<span class="empty hidden" data-for="bDesc">⚠ Empty</span>
+      <textarea id="bDesc" rows="6" placeholder="What is your book about? 2 or 3 short paragraphs. This also goes on Amazon."></textarea>
+    </label>
     <div class="author">
       <div class="photo" id="bPhotoDrop" tabindex="0" role="button" aria-label="Author photo">
         <img id="bPhotoImg" class="hidden" alt="Author photo"><span id="bPhotoHint">📷<br>Author<br>photo</span>
       </div>
-      <label class="grow">About the author<textarea id="bBio" rows="5"></textarea></label>
+      <label class="grow">About the author<span class="empty hidden" data-for="bBio">⚠ Empty</span>
+        <textarea id="bBio" rows="5" placeholder="A few lines about the author. This also goes on the last page of the book."></textarea>
+      </label>
     </div>
-    <button class="primary" id="bUpdate">Update all covers</button>
+    <button class="ghost" id="bUpdate">Show the changes</button>
     <span class="hint" id="bStatus"></span>
   </section>
 
+  <div class="actions">
+    <button class="link" id="back3">← Back</button>
+    <button class="primary huge" id="finishBtn">Finish my books</button>
+  </div>
+</main>
+
+<!-- ============ Screen 4: download ============ -->
+<main id="s4" class="screen hidden">
+  <h1>Your books are ready! 🎉</h1>
+  <p class="hint" id="doneInfo"></p>
+  <button class="primary huge" id="openBtn">Open my books</button>
+  <ul class="editions" id="editions"></ul>
+  <p class="warn hidden" id="notes"></p>
   <section class="card gplay">
     <h2>Sell on Google Play Books too</h2>
     <p class="hint">Every language is ready for Google Play in the folder "Google Play Books", with the eBook, the cover, the details to copy and a step-by-step guide.</p>
     <button class="primary" id="gpSite">Open Google Play Partner Center</button>
     <button class="ghost" id="gpFolder">Open the Google Play folder</button>
   </section>
+  <button class="link" id="back4">← Change the cover or back cover</button>
   <button class="link" id="again">Make another book</button>
 </main>
 
