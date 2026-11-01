@@ -14,6 +14,9 @@ languages) you get one folder and one zip with, for every language:
 - the author's "About the Author" page with photo, translated
 - the Amazon listing (description, 7 keywords, categories, author bio) and a
   plain-words upload guide, including Amazon's AI-translation question
+- a "Google Play Books" folder: every language ready for Google's Partner
+  Center (with ISBNs: files named by ISBN and a filled-in book list, all
+  languages in one upload; without: a folder per language with the details to copy)
 - one "Cover picture prompt" to paste into Gemini; drop the picture back into
   GazBook and every language's covers are redrawn with it
 

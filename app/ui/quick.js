@@ -113,7 +113,7 @@ $('makeBtn').onclick = async () => {
   const r = await run(() => q.make({
     languages: langs, trim: $('trim').value, title: $('title').value.trim(), author: $('author').value.trim(), subtitle: $('subtitle').value.trim(),
     aboutAuthor: { text: $('aboutAuthor').value.trim(), photo: photo && photo.photo, photoGrey: photo && photo.photoGrey },
-    photoFile: photo && photo.file, aboutBook: $('aboutBook').value.trim(),
+    photoFile: photo && photo.file, aboutBook: $('aboutBook').value.trim(), isbns: $('isbns').value.trim(),
   }));
   $('makeBtn').disabled = false; $('back2').disabled = false;
   $('working').classList.add('hidden');
@@ -161,6 +161,8 @@ async function picture(fn) {
 }
 dropZone($('picDrop'), (f) => picture(() => q.dropPicture(f)), () => picture(() => q.pickPicture()));
 $('again').onclick = () => { book = null; result = null; $('bookFound').classList.add('hidden'); $('bookDrop').classList.remove('hidden'); show(1); };
+$('gpSite').onclick = () => q.googlePlay('site');
+$('gpFolder').onclick = () => q.googlePlay('folder');
 $('studioBtn').onclick = () => window.gaz.openStudio();
 
 init();

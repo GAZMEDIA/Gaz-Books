@@ -62,6 +62,8 @@
     <details class="more">
       <summary>More options</summary>
       <label>Book size<select id="trim"></select></label>
+      <label>eBook ISBNs, if you have them <span class="opt">(for Google Play; one per language, like: en 9781234567890, fr 9781234567891)</span>
+        <input id="isbns" placeholder="Leave empty if you don't have ISBNs"></label>
     </details>
 
     <button class="primary huge" id="next1">Next: choose languages →</button>
@@ -115,6 +117,12 @@
         <p class="warn hidden" id="picWarn"></p>
       </div>
     </div>
+  </section>
+  <section class="card gplay">
+    <h2>Sell on Google Play Books too</h2>
+    <p class="hint">Every language is ready for Google Play in the folder "Google Play Books", with the eBook, the cover, the details to copy and a step-by-step guide.</p>
+    <button class="primary" id="gpSite">Open Google Play Partner Center</button>
+    <button class="ghost" id="gpFolder">Open the Google Play folder</button>
   </section>
   <button class="link" id="again">Make another book</button>
 </main>

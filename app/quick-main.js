@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { readBook, safeName } = require('../src/engine');
 const { makeEverything, drawCovers, zipAll } = require('../src/quick');
+const { writeGooglePlay, isbnOk, PARTNER_CENTER } = require('../src/googleplay');
 const { KDP_LANGUAGES } = require('../src/kdp-languages');
 const { offlineTranslate, modelsDir } = require('./offline-main');
 const { fastLanguageCodes, getManifest } = require('../src/fast-translate');
@@ -102,7 +103,13 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     saveSettings({ ...s, trim: o.trim, authors: { ...(s.authors || {}), [key]: remember }, lastAuthor: remember, lastLanguages: o.languages });
     const folder = path.join(app.getPath('documents'), 'GazBook', safeName(o.title || current.summary.title));
     fs.rmSync(folder, { recursive: true, force: true });
-    const res = await makeEverything(current.book, { ...o, folder }, {
+    const isbns = {};
+    for (const m of String(o.isbns || '').matchAll(/([a-z]{2})\s*[:=]?\s*(97[89][\d\s-]{10,16})/gi)) {
+      const v = m[2].replace(/[\s-]/g, '');
+      if (!isbnOk(v)) throw new Error(`"${m[2].trim()}" is not a valid ISBN. It should be 13 digits starting with 978 or 979.`);
+      isbns[m[1].toLowerCase()] = v;
+    }
+    const res = await makeEverything(current.book, { ...o, isbns, folder }, {
       offline: (texts, src, tgt, onPart) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => send({ step: msg, p: -1 }), onProgress: onPart }),
       renderCover,
     }, send);
@@ -175,6 +182,7 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
       send({ step: `Drawing the ${ed.name} covers`, p: n++ / last.editions.length });
       await drawCovers(ed, renderCover, { image: pic.path, imageMode: 'front', bg, ink: '#ffffff' });
     }
+    writeGooglePlay(last.folder, last.editions, { genre: last.genre, isbns: last.isbns }); // the new covers there too
     fs.rmSync(last.zipPath, { force: true });
     last.zipPath = await zipAll(last.folder, path.basename(last.zipPath, '.zip'));
     send({ step: 'Covers ready', p: 1 });
@@ -186,4 +194,9 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
   });
   ipcMain.handle('quick-drop-picture', (_e, file) => usePicture(file));
   ipcMain.handle('quick-prompt', () => (last ? last.prompt : ''));
+  ipcMain.handle('quick-google-play', async (_e, what) => {
+    if (what === 'site') return shell.openExternal(PARTNER_CENTER);
+    if (last) return shell.openPath(path.join(last.folder, 'Google Play Books'));
+    return null;
+  });
 };
