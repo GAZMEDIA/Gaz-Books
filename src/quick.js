@@ -12,6 +12,7 @@ const { buildAll, safeName, authorChapter, ABOUT_AUTHOR_RE } = require('./engine
 const { translateBook, translateStrings } = require('./translate');
 const { kdpLanguage } = require('./kdp-languages');
 const kit = require('./kit-offline');
+const { writeGooglePlay } = require('./googleplay');
 
 // The first two or three sentences (about 55 words): the bio on the back cover.
 function shortBio(text) {
@@ -120,13 +121,16 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     };
     save(`${base} - Amazon listing.txt`, kit.listingText({ lang, title: res.book.title, subtitle: res.book.subtitle, author: res.book.author, desc: w.desc, keys: w.keys, categories: kit.GENRES[genre].categories, bio: w.bio, pages: res.pageCount, printMade: pdfMade }));
     save('How to upload to Amazon.txt', kit.uploadGuide({ lang, trim: opts.trim || '6x9', pages: res.pageCount, printMade: pdfMade, aiCover: !!(opts.cover && opts.cover.image) }));
-    const ed = { code, name: lang.name, dir, base, pages: res.pageCount, printMade: pdfMade, coverSpec, files };
+    const ed = { code, name: lang.name, dir, base, pages: res.pageCount, printMade: pdfMade, coverSpec, files,
+      title: res.book.title, subtitle: res.book.subtitle || '', author: res.book.author || '', words: w };
     if (deps.renderCover) await drawCovers(ed, deps.renderCover);
     editions.push(ed);
     report(code, `${lang.name} ready`, 1);
   }
+  // every language, ready for Google Play Books too
+  writeGooglePlay(folder, editions, { genre, isbns: opts.isbns || {} });
   const zipPath = await zipAll(folder, opts.zipName || safeName(book.title));
-  return { folder, zipPath, editions, genre, prompt, promptFile, notes, seconds: (Date.now() - t0) / 1000 };
+  return { folder, zipPath, editions, genre, isbns: opts.isbns || {}, prompt, promptFile, notes, seconds: (Date.now() - t0) / 1000 };
 }
 
 // The two covers of one language: Kindle (front, JPG) and paperback (whole wrap, PDF).

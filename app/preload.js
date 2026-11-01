@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('gaz', {
     make: (o) => ipcRenderer.invoke('quick-make', o),
     gemini: (how) => ipcRenderer.invoke('quick-gemini', how),
     prompt: () => ipcRenderer.invoke('quick-prompt'),
+    googlePlay: (what) => ipcRenderer.invoke('quick-google-play', what),
     pickPicture: () => ipcRenderer.invoke('quick-pick-picture'),
     dropPicture: (file) => ipcRenderer.invoke('quick-drop-picture', webUtils.getPathForFile(file)),
     onProgress: (fn) => ipcRenderer.on('quick-progress', (_e, d) => fn(d)),
