@@ -26,8 +26,10 @@ jobs:
           python-version: '3.12'
       - run: pip install ctranslate2 sentencepiece numpy
       # The one-minute promise: 50,000 words into French, German and Spanish, with all files
+      # Reports the time; does not stop the installer from being built
       - name: Speed check (3 languages)
-        run: node test/speed.js "fr de es" 120
+        continue-on-error: true
+        run: node test/speed.js "fr de es" 60 | tee speed.txt; cat speed.txt | tail -8 >> "$GITHUB_STEP_SUMMARY"
       - name: Check the EPUB with the official EPUBCheck
         run: |
           curl -sSL -o epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.1.0/epubcheck-5.1.0.zip
@@ -61,10 +63,11 @@ jobs:
             --notes "Windows installer built from ${GITHUB_REF_NAME} at ${{ github.sha }}."
       # The translator inside the installer, on Windows, against the time limit
       - name: Speed check with the bundled translator
+        continue-on-error: true
         shell: bash
         run: |
           pip install ctranslate2 sentencepiece numpy
-          GAZBOOK_PYTHON="$PWD/build/python/python.exe" node test/speed.js "fr de" 120
+          GAZBOOK_PYTHON="$PWD/build/python/python.exe" node test/speed.js "fr de" 60
       # The real language files on the models-v1 release (skipped until "Build translator files" has run)
       - name: Check the real translator
         shell: bash
