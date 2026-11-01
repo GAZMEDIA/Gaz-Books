@@ -157,21 +157,47 @@ const blurbOf = (desc) => String(desc || '').replace(/\n?Inside this book:[\s\S]
 // What the back cover says now (in the original language), for the "Check your back cover" editor.
 function backCover(res) {
   const e = res.editions.find((x) => x.code === res.source) || res.editions[0];
-  return { tagline: e.words.quote, desc: blurbOf(e.words.desc), bio: e.words.bio, photo: res.aboutAuthor.photo || '', suggestion: res.suggestion || '' };
+  return { title: e.title, subtitle: e.subtitle, author: e.author,
+    tagline: e.words.quote, desc: blurbOf(e.words.desc), bio: e.words.bio, photo: res.aboutAuthor.photo || '', suggestion: res.suggestion || '' };
 }
 
 // The author changed the back cover: translate the new words for every language,
 // redo each book's About the Author page, and redraw every cover.
-// vals: { tagline, desc, bio, photo, photoGrey }
+// vals: { title, subtitle, author, tagline, desc, bio, photo, photoGrey }
 async function updateBack(res, vals, deps, onProgress = () => {}) {
   res.aboutAuthor = { text: vals.bio || '', photo: vals.photo || '', photoGrey: vals.photoGrey || vals.photo || '' };
+  const src = res.editions.find((x) => x.code === res.source) || res.editions[0];
+  const title = vals.title || src.title;
+  const subtitle = vals.subtitle !== undefined ? vals.subtitle : src.subtitle;
+  const author = vals.author || src.author;
+  const namesChanged = title !== src.title || subtitle !== src.subtitle;
   const list = [vals.desc || '', vals.tagline || '', vals.bio || '', shortBio(vals.bio)];
   let n = 0;
   for (const ed of res.editions) {
     onProgress({ step: `Updating ${ed.name}`, p: n++ / res.editions.length });
-    const [desc, quote, bio, sbio] = ed.code === res.source || !list.some(Boolean) ? list
-      : await translateStrings(list, { engine: 'offline', target: ed.code, language: ed.name, source: res.source, offline: deps.offline });
+    const tr = { engine: 'offline', target: ed.code, language: ed.name, source: res.source, offline: deps.offline };
+    const own = ed.code === res.source;
+    const [desc, quote, bio, sbio] = own || !list.some(Boolean) ? list : await translateStrings(list, tr);
     Object.assign(ed.words, { desc, quote, bio, shortBio: sbio });
+    // the cover words: the author's name is the same everywhere; title and subtitle are translated
+    if (own) Object.assign(ed, { title, subtitle });
+    else if (namesChanged) {
+      const [t, st] = await translateStrings([title, subtitle || ''], tr);
+      Object.assign(ed, { title: t || title, subtitle: st });
+    }
+    ed.author = author;
+    Object.assign(ed.book, { title: ed.title, subtitle: ed.subtitle, author });
+    const newBase = safeName(ed.title);
+    if (newBase !== ed.base) { // new title: the files get the new name
+      ed.files = ed.files.map((f) => {
+        const name = path.basename(f);
+        if (!name.startsWith(`${ed.base} - `)) return f;
+        const to = path.join(ed.dir, newBase + name.slice(ed.base.length));
+        if (fs.existsSync(f)) fs.renameSync(f, to);
+        return to;
+      });
+      ed.base = newBase;
+    }
     // the About the Author page inside the books
     const b = ed.book;
     b.chapters = b.chapters.filter((c) => !c.aboutAuthor);
@@ -189,10 +215,14 @@ async function updateBack(res, vals, deps, onProgress = () => {}) {
       ed.pages = built.pageCount;
     }
     fs.writeFileSync(path.join(ed.dir, `${ed.base} - Amazon listing.txt`), kit.listingText({ lang: ed.lang, title: ed.title, subtitle: ed.subtitle, author: ed.author, desc, keys: ed.words.keys, categories: kit.GENRES[res.genre].categories, bio, pages: ed.pages, printMade: ed.printMade }));
-    Object.assign(ed.coverSpec, { tagline: quote, blurb: blurbOf(desc), bio: sbio, authorPhoto: vals.photo || '', pages: ed.pages });
+    Object.assign(ed.coverSpec, { title: ed.title, subtitle: ed.subtitle, author, tagline: quote, blurb: blurbOf(desc), bio: sbio, authorPhoto: vals.photo || '', pages: ed.pages });
     if (deps.renderCover) await drawCovers(ed, deps.renderCover);
   }
-  onProgress({ step: 'Back cover updated', p: 1 });
+  if (namesChanged) { // the zip takes the new title too
+    fs.rmSync(res.zipPath, { force: true });
+    res.zipPath = path.join(res.folder, `${safeName(title)}.zip`);
+  }
+  onProgress({ step: 'Cover updated', p: 1 });
   return res;
 }
 

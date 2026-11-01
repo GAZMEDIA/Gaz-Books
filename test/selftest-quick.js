@@ -61,6 +61,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         await js(`bDesc.value = 'Every believer faces barricades. Some are built by the enemy, some by fear, and some by our own past.\\n\\nThis book shows how God brings his people from behind those barricades, and how to go beyond the borders that once held them back.'`);
         await js("document.getElementById('suggest').click()");
         await js(`bBio.value = 'Dr. Noble Nnakenyi is a petroleum geologist by training and a Prophetic Evangelist by calling. He leads Noble Transformation Ministries.\\n\\nHe is married with five children.'`);
+        console.log('COVER WORDS', await js("bTitle.value + ' | ' + bSub.value + ' | ' + bAuthor.value"));
+        await js("bAuthor.value = 'Dr. Noble Nnakenyi'; bAuthor.dispatchEvent(new Event('input')); 0");
         await js("document.getElementById('bPhotoDrop').click()");
         await until("!document.getElementById('bPhotoImg').classList.contains('hidden')", 20);
         await js("document.getElementById('bUpdate').click()");
