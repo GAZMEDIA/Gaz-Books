@@ -21,6 +21,13 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ctranslate2 sentencepiece numpy
+      # The one-minute promise: 50,000 words into French, German and Spanish, with all files
+      - name: Speed check (3 languages)
+        run: node test/speed.js "fr de es" 120
       - name: Check the EPUB with the official EPUBCheck
         run: |
           curl -sSL -o epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.1.0/epubcheck-5.1.0.zip
@@ -37,6 +44,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: npm run dist
       # Saved as a release (not an Actions artifact) so the installer is easy to download.
       - name: Publish installer
@@ -49,9 +59,16 @@ jobs:
             --target "${{ github.sha }}" --prerelease \
             --title "GazBook build ${{ github.run_number }} (${GITHUB_REF_NAME})" \
             --notes "Windows installer built from ${GITHUB_REF_NAME} at ${{ github.sha }}."
-      # The free translator that runs on the computer: download the model and translate a little.
-      - name: Check the on-computer translator
-        run: node test/offline-translate.js "$env:RUNNER_TEMP\models"
+      # The translator inside the installer, on Windows, against the time limit
+      - name: Speed check with the bundled translator
+        shell: bash
+        run: |
+          pip install ctranslate2 sentencepiece numpy
+          GAZBOOK_PYTHON="$PWD/build/python/python.exe" node test/speed.js "fr de" 120
+      # The real language files on the models-v1 release (skipped until "Build translator files" has run)
+      - name: Check the real translator
+        shell: bash
+        run: GAZBOOK_PYTHON="$PWD/build/python/python.exe" node test/offline-translate.js "$RUNNER_TEMP/models"
       # GazBook's built-in AI: download it, write a listing, then check the installed app can run it too.
       - name: Check the built-in AI
         run: node test/local-ai.js "$env:RUNNER_TEMP\ai"

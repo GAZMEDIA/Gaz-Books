@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>GazBook</title>
+<link rel="stylesheet" href="quick.css">
+</head>
+<body>
+<header>
+  <div class="brand"><img class="logo" src="../icon.png" alt=""> GazBook</div>
+  <div class="steps" aria-label="Steps">
+    <span class="dot on" id="dot1">1 Your book</span><span class="dot" id="dot2">2 Languages</span><span class="dot" id="dot3">3 Ready</span>
+  </div>
+  <button class="link" id="studioBtn" title="All the tools: AI checks, cover studio, settings and your plan">More tools</button>
+</header>
+
+<p class="error hidden" id="error" role="alert"></p>
+
+<!-- ============ Screen 1: the book ============ -->
+<main id="s1" class="screen">
+  <h1>Put your book here</h1>
+  <div class="drop big" id="bookDrop" tabindex="0" role="button" aria-label="Choose your book">
+    <div class="icon">📖</div>
+    <p><b>Drag your book here</b><br>or click to choose it</p>
+    <p class="hint">Word, PDF or text file</p>
+  </div>
+
+  <div id="bookFound" class="hidden">
+    <div class="found">
+      <div class="tick">✓</div>
+      <div>
+        <p class="big-line">We found: <b id="fTitle"></b><span id="fBy"></span></p>
+        <p class="hint" id="fInfo"></p>
+      </div>
+      <button class="link" id="fixBtn">Fix the title</button>
+    </div>
+    <div id="fixBox" class="hidden grid2">
+      <label>Book title<input id="title"></label>
+      <label>Author name<input id="author"></label>
+      <label class="span2">Subtitle (you can leave it empty)<input id="subtitle"></label>
+    </div>
+
+    <section class="card">
+      <h2>Tell readers about you <span class="opt">(you can skip this)</span></h2>
+      <div class="author">
+        <div class="photo" id="photoDrop" tabindex="0" role="button" aria-label="Add your photo">
+          <img id="photoImg" class="hidden" alt="Your photo">
+          <span id="photoHint">📷<br>Put your<br>photo here</span>
+        </div>
+        <label class="grow">A few lines about yourself
+          <textarea id="aboutAuthor" rows="6" placeholder="For example: Jane is a teacher from Buea. She loves stories about…"></textarea>
+        </label>
+      </div>
+      <p class="warn hidden" id="photoWarn"></p>
+      <label>What is your book about? <span class="opt">(for Amazon and the back cover; if you leave it empty, GazBook writes it from your book)</span>
+        <textarea id="aboutBook" rows="4"></textarea>
+      </label>
+      <p class="hint">GazBook remembers this for your next book.</p>
+    </section>
+
+    <details class="more">
+      <summary>More options</summary>
+      <label>Book size<select id="trim"></select></label>
+    </details>
+
+    <button class="primary huge" id="next1">Next: choose languages →</button>
+  </div>
+</main>
+
+<!-- ============ Screen 2: languages ============ -->
+<main id="s2" class="screen hidden">
+  <h1>Which languages do you want?</h1>
+  <p class="hint">Only languages Amazon accepts are shown. English is your original book.</p>
+  <div class="langs" id="langs"></div>
+  <p class="hint" id="ebookOnly"></p>
+  <div class="actions">
+    <button class="link" id="back2">← Back</button>
+    <button class="primary huge" id="makeBtn">Make my books</button>
+  </div>
+  <div id="working" class="hidden working">
+    <div class="bar"><div id="barFill"></div></div>
+    <p class="status" id="status">Starting…</p>
+    <p class="hint" id="timeLeft"></p>
+  </div>
+</main>
+
+<!-- ============ Screen 3: ready ============ -->
+<main id="s3" class="screen hidden">
+  <h1>Your books are ready! 🎉</h1>
+  <p class="hint" id="doneInfo"></p>
+  <button class="primary huge" id="openBtn">Open my books</button>
+  <ul class="editions" id="editions"></ul>
+  <p class="warn hidden" id="notes"></p>
+
+  <section class="card cover">
+    <div class="cover-row">
+      <img id="coverNow" alt="Your cover now">
+      <div>
+        <h2>Now let's make your cover picture: 3 easy steps</h2>
+        <p class="hint">Right now your books have a simple cover. A picture from Gemini makes it beautiful, and one picture works for every language.</p>
+        <ol class="three">
+          <li><button class="primary" id="copyPrompt">1. Copy cover instructions</button> <span class="done hidden" id="copied">Done! Now press the next button.</span></li>
+          <li><button class="primary" id="openGemini">2. Open Gemini</button>
+            <div class="tip hidden" id="geminiTip">In Gemini: press <b>Ctrl + V</b> to paste, then <b>Enter</b>. When the picture is ready, save it (Download).</div>
+            <div class="nogem hidden" id="noGemini">
+              <p>The Gemini app is not on this computer.</p>
+              <button class="primary" id="getGemini">Get the free Gemini app</button>
+              <button class="ghost" id="webGemini">Use Gemini on the web instead</button>
+              <p class="hint">After installing, press "2. Open Gemini" again. Sign in with your Gmail.</p>
+            </div>
+          </li>
+          <li><div class="drop small" id="picDrop" tabindex="0" role="button" aria-label="Add the cover picture"><b>3. Put your picture here</b><br><span class="hint">drag it here or click</span></div></li>
+        </ol>
+        <p class="warn hidden" id="picWarn"></p>
+      </div>
+    </div>
+  </section>
+  <button class="link" id="again">Make another book</button>
+</main>
+
+<script src="quick.js"></script>
+</body>
+</html>

@@ -87,7 +87,7 @@ function layoutBook(book, opts, s, family, hyph) {
     line += t.label || t.name ? 1 : 0;
 
     let afterBreak = true;
-    let dropDone = opts.dropCaps === false;
+    let dropDone = opts.dropCaps === false || !!ch.aboutAuthor;
     let dropRemaining = 0;
     let dropWidth = 0;
 
@@ -110,12 +110,12 @@ function layoutBook(book, opts, s, family, hyph) {
         continue;
       }
       if (blk.type === 'img') {
-        const img = imageBuffer(blk.src);
+        const img = imageBuffer(blk.print || blk.src); // print: the black-and-white version for the paperback
         if (!img) continue;
         let iw; let ih;
         try { const o = doc.openImage(img); iw = o.width; ih = o.height; } catch { continue; }
         const maxH = (perPage - 2) * s.leading;
-        let w = Math.min(colW, iw * 0.75);
+        let w = Math.min(colW * (blk.scale || 1), iw * 0.75); // scale: part of the text width (author photo)
         let h = (ih / iw) * w;
         if (h > maxH) { h = maxH; w = (iw / ih) * h; }
         const rows = Math.ceil(h / s.leading) + 1;

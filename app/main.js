@@ -47,7 +47,8 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   win.setMenuBarVisibility(false);
-  win.loadFile(path.join(__dirname, 'ui', 'index.html'));
+  // the one-click screens; "More tools" in there opens the full studio (index.html)
+  win.loadFile(path.join(__dirname, 'ui', 'quick.html'));
 }
 
 // The free week starts the first time the app opens.
@@ -133,7 +134,7 @@ ipcMain.handle('build', async (_e, opts) => {
       if (tr.engine === 'gemini' && !s.geminiKey) throw new Error('Add your free Gemini key in Settings first (click "Get my free Gemini key").');
       if (tr.engine === 'claude' || tr.engine === 'gemini') need('ai');
       // the on-computer translator; also the backup when Google free can't be reached (offline)
-      tr.offline = (texts, src, tgt) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => progress(msg, 0) });
+      tr.offline = (texts, src, tgt, onPart) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => progress(msg, 0), onProgress: onPart });
       langs.push(tr);
       const job = { ...opts, translate: tr };
       // the cover in this language too: same design, translated words, spine fitted to the new page count
@@ -190,6 +191,10 @@ const { renderCover, saveAsJpeg } = require('./cover-main')({ getWin: () => win,
 ipcMain.handle('local-ai-ready', () => localAi.isDownloaded(modelDir()));
 
 const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
+require('./quick-main')({ getWin: () => win, loadSettings, saveSettings, need, renderCover, saveAsJpeg });
+ipcMain.handle('open-studio', () => win.loadFile(path.join(__dirname, 'ui', 'index.html')));
+ipcMain.handle('open-quick', () => win.loadFile(path.join(__dirname, 'ui', 'quick.html')));
+app.on('before-quit', () => require('../src/fast-translate').stopWorker());
 require('../src/ai').setAiCache(path.join(app.getPath('userData'), 'ai-cache'));
 
 ipcMain.handle('open-path', (_e, p) => shell.openPath(p));

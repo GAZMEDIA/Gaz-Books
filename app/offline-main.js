@@ -1,62 +1,32 @@
-// The free translator that runs on this computer: Meta's M2M100 (418M, MIT
-// licence, about 100 languages) through Transformers.js and ONNX Runtime.
-// The model (about 500 MB) is downloaded once, the first time it is used,
-// into the app's own folder; after that it works without the internet.
+// The free translator that runs on this computer (see src/fast-translate.js):
+// no keys, no fees, every CPU core. Each language's files (about 75 MB) are
+// downloaded once, the first time that language is used; after that it
+// works without the internet.
 const path = require('path');
 const { plain } = require('../src/read');
 const { htmlToRuns, runsToHtml } = require('../src/translate');
+const { translatePlain, fastLanguageCodes } = require('../src/fast-translate');
+const { KDP_LANGUAGES, kdpLanguage } = require('../src/kdp-languages');
 
-const MODEL = 'Xenova/m2m100_418M';
-// the languages M2M100 knows (ISO 639 codes, as the model names them)
-const CODES = 'af am ar ast az ba be bg bn br bs ca ceb cs cy da de el en es et fa ff fi fr fy ga gd gl gu ha he hi hr ht hu hy id ig ilo is it ja jv ka kk km kn ko lb lg ln lo lt lv mg mk ml mn mr ms my ne nl no ns oc or pa pl ps pt ro ru sd si sk sl so sq sr ss su sv sw ta th tl tn tr uk ur uz vi wo xh yi yo zh zu'.split(' ');
-const NAMES = { ns: 'Northern Sotho', ff: 'Fula', ilo: 'Ilocano', ast: 'Asturian', ceb: 'Cebuano' };
+const modelsDir = () => process.env.GAZBOOK_TRANSLATOR_DIR || path.join(require('electron').app.getPath('userData'), 'models', 'translator');
 
 function offlineLanguages() {
-  const dn = new Intl.DisplayNames(['en'], { type: 'language' });
-  return CODES.map((code) => ({ code, name: NAMES[code] || dn.of(code) || code })).sort((a, b) => a.name.localeCompare(b.name));
+  const have = fastLanguageCodes(modelsDir());
+  return KDP_LANGUAGES.filter((l) => l.code !== 'en' && (!have || have.includes(l.code))).map((l) => ({ code: l.code, name: l.name }));
 }
 
-let loading = null;
-function translator(cacheDir, onStatus) {
-  if (!loading) {
-    loading = (async () => {
-      const { pipeline, env } = require('@huggingface/transformers');
-      env.cacheDir = cacheDir;
-      env.allowLocalModels = false;
-      const seen = {};
-      return pipeline('translation', MODEL, {
-        dtype: 'q8',
-        progress_callback: (p) => {
-          if (p.status !== 'progress' || !p.total) return;
-          seen[p.file] = [p.loaded, p.total];
-          const [l, t] = Object.values(seen).reduce(([a, b], [x, y]) => [a + x, b + y], [0, 0]);
-          onStatus(`Downloading the free translator (only the first time, about 500 MB): ${Math.round((l / t) * 100)}%`);
-        },
-      });
-    })().catch((e) => { loading = null; throw new Error(`The free translator could not be downloaded. Check the internet connection and try again. (${e.message})`); });
-  }
-  return loading;
+// texts: HTML with <i>/<b>. A paragraph that is all italic (or all bold)
+// stays that way; mixed styling inside a paragraph becomes plain text.
+async function offlineTranslate(texts, source, target, { cacheDir, onStatus = () => {}, onProgress = () => {} } = {}) {
+  const runs = texts.map((h) => htmlToRuns(h));
+  const style = runs.map((r) => {
+    const t = r.filter((x) => x.text.trim());
+    return { i: t.length > 0 && t.every((x) => x.i), b: t.length > 0 && t.every((x) => x.b) };
+  });
+  const out = await translatePlain(runs.map((r) => plain(r)), source || 'en', target, {
+    modelsDir: cacheDir || modelsDir(), onStatus, onProgress, languageName: (kdpLanguage(target) || {}).name,
+  });
+  return out.map((t, k) => runsToHtml([{ text: t, ...(style[k].i ? { i: true } : {}), ...(style[k].b ? { b: true } : {}) }]));
 }
 
-// Long paragraphs go sentence by sentence: the model is best at short pieces.
-const sentences = (t) => t.split(/(?<=[.!?…]["”’')]*)\s+(?=\S)/).filter((s) => s.trim());
-
-// texts: HTML with <i>/<b>; the model can't keep those, so it gets plain text.
-async function offlineTranslate(texts, source, target, { cacheDir, onStatus = () => {} }) {
-  if (!CODES.includes(target)) throw new Error('The free translator on this computer does not know that language. Try Google free instead.');
-  const src = CODES.includes(source) ? source : 'en';
-  const t = await translator(cacheDir || path.join(require('electron').app.getPath('userData'), 'models'), onStatus);
-  const out = [];
-  for (const html of texts) {
-    const parts = sentences(plain(htmlToRuns(html)));
-    const done = [];
-    for (let i = 0; i < parts.length; i += 8) {
-      const r = await t(parts.slice(i, i + 8), { src_lang: src, tgt_lang: target, max_new_tokens: 400 });
-      done.push(...(Array.isArray(r) ? r : [r]).map((x) => x.translation_text));
-    }
-    out.push(runsToHtml([{ text: done.join(' ') }]));
-  }
-  return out;
-}
-
-module.exports = { offlineTranslate, offlineLanguages, OFFLINE_CODES: CODES };
+module.exports = { offlineTranslate, offlineLanguages, modelsDir };

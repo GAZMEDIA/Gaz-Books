@@ -41,7 +41,7 @@ async function makeDocx(book, opts = {}, pageCount = 200) {
   const media = [];
   let docPrId = 1;
 
-  const imagePara = (src) => {
+  const imagePara = (src, scale = 1) => {
     const m = /^data:image\/(png|jpe?g);base64,(.*)$/i.exec(src || '');
     if (!m) return '';
     const buf = Buffer.from(m[2], 'base64');
@@ -52,7 +52,7 @@ async function makeDocx(book, opts = {}, pageCount = 200) {
     const name = `image${media.length + 1}.${ext}`;
     media.push({ rid, name, buf });
     const maxW = (s.pageW - s.inside - s.outside) / 72; // inches
-    let wIn = Math.min(maxW, dim.w / 96);
+    let wIn = Math.min(maxW * scale, dim.w / 96);
     let hIn = (dim.h / dim.w) * wIn;
     const maxH = (s.pageH - s.top - s.bottom) / 72 * 0.8;
     if (hIn > maxH) { hIn = maxH; wIn = (dim.w / dim.h) * hIn; }
@@ -104,11 +104,11 @@ async function makeDocx(book, opts = {}, pageCount = 200) {
     else body.push(para('Spacer', '', `<w:spacing w:before="${tw(s.pageH * 0.2)}"/>`));
     body.push(para('Heading1', run(t.name || ' ')));
     let afterBreak = true;
-    let dropDone = opts.dropCaps === false;
+    let dropDone = opts.dropCaps === false || !!ch.aboutAuthor;
     for (const b of ch.blocks) {
       if (b.type === 'break') { body.push(para('SceneBreak', run('*   *   *'))); afterBreak = true; continue; }
       if (b.type === 'h2') { body.push(para('Heading2', runs(b.runs))); afterBreak = true; continue; }
-      if (b.type === 'img') { const p = imagePara(b.src); if (p) body.push(p); afterBreak = true; continue; }
+      if (b.type === 'img') { const p = imagePara(b.src, b.scale || 1); if (p) body.push(p); afterBreak = true; continue; }
       if (b.type === 'quote') { body.push(para('BlockQuote', runs(b.runs))); continue; }
       let rs = b.runs;
       if (!dropDone) {

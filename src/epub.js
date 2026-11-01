@@ -119,7 +119,7 @@ ${opts.copyrightExtra ? String(opts.copyrightExtra).split('\n').map((l) => `<p>$
     const heading = ch.title ? `<h1>${t.label ? `<span class="label">${esc(t.label)}</span>` : ''}${esc(t.name)}</h1>` : '';
     const parts = [];
     let afterBreak = true;
-    let dropDone = opts.dropCaps === false;
+    let dropDone = opts.dropCaps === false || !!ch.aboutAuthor;
     for (const b of ch.blocks) {
       if (b.type === 'break') { parts.push('<p class="scene">* * *</p>'); afterBreak = true; continue; }
       if (b.type === 'h2') { parts.push(`<h2>${runsHtml(b.runs)}</h2>`); afterBreak = true; continue; }
@@ -130,7 +130,7 @@ ${opts.copyrightExtra ? String(opts.copyrightExtra).split('\n').map((l) => `<p>$
         const name = `images/img${++imgN}.${ext}`;
         zip.file(`OEBPS/${name}`, Buffer.from(m[2], 'base64'));
         files.push({ id: `img${imgN}`, href: name, type: ext === 'jpg' ? 'image/jpeg' : `image/${ext}`, spine: false });
-        parts.push(`<p class="figure"><img src="${name}" alt=""/></p>`);
+        parts.push(`<p class="figure"><img src="${name}" alt="${esc(b.alt || '')}"${b.scale ? ` style="width:${Math.round(b.scale * 100)}%"` : ''}/></p>`);
         afterBreak = true;
         continue;
       }
