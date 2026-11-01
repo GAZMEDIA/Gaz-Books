@@ -11,7 +11,7 @@ let settings = {};
 const clean = (m) => String(m || '').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 function showError(m) { $('error').textContent = clean(m); $('error').classList.toggle('hidden', !m); }
 function show(n) {
-  for (const i of [1, 2, 3]) {
+  for (const i of [1, 2, 3, 4]) {
     $(`s${i}`).classList.toggle('hidden', i !== n);
     $(`dot${i}`).className = `dot${i === n ? ' on' : i < n ? ' done' : ''}`;
   }
@@ -129,20 +129,41 @@ $('makeBtn').onclick = async () => {
   if (r) { settings.lastLanguages = langs; done(r); }
 };
 
-// ---------------------------------------------------------------- screen 3
+// ---------------------------------------------------------------- screen 3: check before printing
 
 function done(r) {
   result = r;
-  $('doneInfo').textContent = `${r.editions.length} language${r.editions.length > 1 ? 's' : ''} made in ${Math.round(r.seconds)} seconds. Everything is in one folder and one zip file.`;
-  $('editions').innerHTML = r.editions.map((e) => `<li><b>${e.name}</b>${e.printMade ? `Paperback (${e.pages} pages), ` : ''}Kindle eBook, Word, covers, Amazon listing</li>`).join('');
-  $('notes').textContent = (r.notes || []).join(' ');
-  $('notes').classList.toggle('hidden', !(r.notes || []).length);
+  $('madeInfo').textContent = `${r.editions.length} language${r.editions.length > 1 ? 's' : ''} made in ${Math.round(r.seconds)} seconds. Check the cover and the back, then press "Finish my books".`;
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
-  showBack(r.back); showWrap(r);
-  $('copied').classList.add('hidden'); $('geminiTip').classList.add('hidden'); $('noGemini').classList.add('hidden');
+  showBack(r.back); showWrap(r); showBlanks();
+  $('copied').classList.add('hidden'); $('geminiTip').classList.add('hidden'); $('noGemini').classList.add('hidden'); $('picWarn').classList.add('hidden');
+  $('bStatus').textContent = '';
   show(3);
 }
-$('openBtn').onclick = () => window.gaz.openPath(result.folder);
+$('back3').onclick = () => show(2);
+
+// What is still empty, at the top and beside each box.
+function emptyList() {
+  const out = [];
+  if (!$('bDesc').value.trim()) out.push('The book description is empty (back cover and Amazon).');
+  if (!$('bBio').value.trim()) out.push('"About the author" is empty (back cover and the last page of the book).');
+  if (!backPhoto) out.push('There is no author photo.');
+  if (!$('bTag').value.trim()) out.push('The line at the top of the back cover is empty (optional).');
+  return out;
+}
+function showBlanks() {
+  for (const id of ['bTag', 'bDesc', 'bBio']) {
+    const empty = !$(id).value.trim();
+    $(id).classList.toggle('missing', empty);
+    document.querySelector(`.empty[data-for=${id}]`).classList.toggle('hidden', !empty);
+  }
+  $('bPhotoDrop').classList.toggle('missing', !backPhoto);
+  const list = emptyList();
+  $('blanks').classList.toggle('hidden', !list.length);
+  $('blanks').innerHTML = list.length ? `<b>⚠ Still empty — fill these in before you finish:</b><ul>${list.map((x) => `<li>${x}</li>`).join('')}</ul>` : '';
+}
+for (const id of ['bTag', 'bDesc', 'bBio']) $(id).addEventListener('input', () => { dirty = true; showBlanks(); });
+
 $('copyPrompt').onclick = async () => {
   const p = await q.prompt();
   await navigator.clipboard.writeText(p).catch(() => {});
@@ -171,9 +192,10 @@ async function picture(fn) {
   $('picWarn').className = r.warn ? 'warn' : 'success';
 }
 dropZone($('picDrop'), (f) => picture(() => q.dropPicture(f)), () => picture(() => q.pickPicture()));
-$('again').onclick = () => { book = null; result = null; $('bookFound').classList.add('hidden'); $('bookDrop').classList.remove('hidden'); show(1); };
+
 // ---------------------------------------------------------------- back cover
 let backPhoto = null;
+let dirty = false;
 function showWrap(r) {
   $('wrapImg').classList.toggle('hidden', !r.wrap);
   if (r.wrap) $('wrapImg').src = r.wrap;
@@ -181,29 +203,61 @@ function showWrap(r) {
 function showBack(b) {
   if (!b) return;
   $('bTag').value = b.tagline || ''; $('bDesc').value = b.desc || ''; $('bBio').value = b.bio || '';
+  suggestion = b.suggestion || '';
+  $('suggest').classList.toggle('hidden', !suggestion);
   backPhoto = b.photo ? { photo: b.photo, photoGrey: (photo && photo.photoGrey) || b.photo, file: photo && photo.file } : null;
   setBackPhoto();
+  dirty = false;
 }
+let suggestion = '';
+$('suggest').onclick = () => { $('bTag').value = suggestion; dirty = true; showBlanks(); };
 function setBackPhoto() {
   $('bPhotoImg').classList.toggle('hidden', !backPhoto);
   $('bPhotoHint').classList.toggle('hidden', !!backPhoto);
   if (backPhoto) $('bPhotoImg').src = backPhoto.photo;
+  showBlanks();
 }
-dropZone($('bPhotoDrop'), (f) => run(() => q.dropPhoto(f)).then((p) => { if (p) { backPhoto = p; setBackPhoto(); } }),
-  () => run(() => q.pickPhoto()).then((p) => { if (p) { backPhoto = p; setBackPhoto(); } }));
-$('bUpdate').onclick = async () => {
-  $('bUpdate').disabled = true; $('bStatus').textContent = 'Updating every language…';
+const gotPhoto = (p) => { if (p) { backPhoto = p; dirty = true; setBackPhoto(); } };
+dropZone($('bPhotoDrop'), (f) => run(() => q.dropPhoto(f)).then(gotPhoto), () => run(() => q.pickPhoto()).then(gotPhoto));
+
+// Puts the words and photo on every language's cover and About the Author page.
+async function applyBack() {
+  $('bUpdate').disabled = true; $('finishBtn').disabled = true;
+  $('bStatus').textContent = 'Updating every language…';
   const r = await run(() => q.updateBack({
     tagline: $('bTag').value.trim(), desc: $('bDesc').value.trim(), bio: $('bBio').value.trim(),
     photo: backPhoto && backPhoto.photo, photoGrey: backPhoto && backPhoto.photoGrey, photoFile: backPhoto && backPhoto.file,
   }));
-  $('bUpdate').disabled = false; $('bStatus').textContent = '';
-  if (!r) return;
-  result = r;
+  $('bUpdate').disabled = false; $('finishBtn').disabled = false; $('bStatus').textContent = '';
+  if (!r) return false;
+  result = r; dirty = false;
   if (r.kindleCover) $('coverNow').src = r.kindleCover;
   showWrap(r);
-  $('bStatus').textContent = `Done: the back cover and About the Author page are updated in all ${r.editions.length} language${r.editions.length > 1 ? 's' : ''}.`;
+  $('bStatus').textContent = 'Done: see the cover above. Every language is updated.';
+  return true;
+}
+$('bUpdate').onclick = applyBack;
+
+// ---------------------------------------------------------------- finish → screen 4
+
+$('finishBtn').onclick = async () => {
+  const list = emptyList().filter((x) => !/optional/.test(x));
+  if (list.length && !confirm(`These are still empty:\n\n• ${list.join('\n• ')}\n\nFinish anyway? (Press Cancel to fill them in.)`)) return;
+  if (dirty && !(await applyBack())) return;
+  $('finishBtn').disabled = true; $('finishBtn').textContent = 'Finishing…';
+  const r = await run(() => q.finish());
+  $('finishBtn').disabled = false; $('finishBtn').textContent = 'Finish my books';
+  if (!r) return;
+  result = r;
+  $('doneInfo').textContent = `${r.editions.length} language${r.editions.length > 1 ? 's' : ''}, everything in one folder and one zip file.`;
+  $('editions').innerHTML = r.editions.map((e) => `<li><b>${e.name}</b>${e.printMade ? `Paperback (${e.pages} pages), ` : ''}Kindle eBook, Word, covers, Amazon listing</li>`).join('');
+  $('notes').textContent = (r.notes || []).join(' ');
+  $('notes').classList.toggle('hidden', !(r.notes || []).length);
+  show(4);
 };
+$('openBtn').onclick = () => window.gaz.openPath(result.folder);
+$('back4').onclick = () => show(3);
+$('again').onclick = () => { book = null; result = null; $('bookFound').classList.add('hidden'); $('bookDrop').classList.remove('hidden'); show(1); };
 
 $('gpSite').onclick = () => q.googlePlay('site');
 $('gpFolder').onclick = () => q.googlePlay('folder');

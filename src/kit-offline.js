@@ -155,7 +155,13 @@ function pullQuote(book) {
 // Never from a title page, copyright page, dedication or thanks: from the
 // Introduction or Preface if there is one, otherwise the first real chapter.
 const NOT_TEXT = /(publish|publication|printed|designed|p\.\s?o\.\s?box|\btel\b|e-?mail|www\.|isbn|copyright|\u00A9|all rights|scripture quotations|first (published|edition))/i;
-function description(book, aboutBook, genre) {
+// Only the author's own words: if they gave none, it stays empty and the
+// "Check before printing" stage asks for it. (descriptionDraft is the old
+// automatic version, kept for anyone who asks GazBook for a suggestion.)
+function description(book, aboutBook) {
+  return aboutBook && aboutBook.trim() ? aboutBook.trim() : '';
+}
+function descriptionDraft(book, aboutBook, genre) {
   if (aboutBook && aboutBook.trim()) return aboutBook.trim();
   const skip = /^(about the author|acknowledg|dedication|contents|copyright|title page|also by|books by)/i;
   const chapters = book.chapters.filter((c) => c.title && !c.aboutAuthor && !skip.test(c.title) && !/^(introduction|preface|foreword|prologue)/i.test(c.title));
@@ -251,4 +257,4 @@ function uploadGuide({ lang, trim, pages, printMade, aiCover }) {
   return steps.join('\n');
 }
 
-module.exports = { GENRES, detectGenre, keywords, pullQuote, description, coverPrompt, listingText, uploadGuide };
+module.exports = { GENRES, detectGenre, keywords, pullQuote, description, descriptionDraft, coverPrompt, listingText, uploadGuide };
