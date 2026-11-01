@@ -74,7 +74,11 @@ def translate(req):
         hyp = r.hypotheses[0]
         if lt and hyp and hyp[0] == lt.format(req["tgt"]):
             hyp = hyp[1:]
-        out[k] = m["tgt"].decode_pieces(hyp) if hasattr(m["tgt"], "decode_pieces") else m["tgt"].decode(hyp)
+        # rebuild the words from the pieces ourselves: SentencePiece's decoder leaves
+        # its word marker "\u2581" in the text when a piece came from the source
+        # (a symbol like \u20a6 or \u2713 the target side doesn't know)
+        text = "".join(p for p in hyp if p not in ("<unk>", "<s>", "</s>", "<pad>")).replace("\u2581", " ")
+        out[k] = " ".join(text.replace("\u2047", " ").split())
     return out
 
 

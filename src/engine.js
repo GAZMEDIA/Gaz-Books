@@ -49,7 +49,30 @@ function missingGlyphs(book, family) {
   };
   check(`${book.title}${book.author}${book.subtitle}`);
   for (const ch of book.chapters) { check(ch.title || ''); for (const b of ch.blocks) if (b.runs) check(plain(b.runs)); }
-  return { total, missing: seen.size };
+  const chars = [...seen].map((cp) => String.fromCodePoint(cp));
+  return { total, missing: seen.size, chars, letters: chars.filter((c) => /\p{L}/u.test(c)) };
+}
+
+// Characters no print font can draw and nobody needs to see: translator word
+// markers, invisible joiners, odd spaces. Cleaned out of the whole book.
+const ODD = [[/[\u2581\u2047]/g, ' '], [/[\u200B-\u200D\u2060\uFEFF]/g, ''], [/[\u2009\u202F\u2007]/g, '\u00A0'], [/[\u2028\u2029]/g, ' ']];
+function cleanText(t) { let s = String(t || ''); for (const [re, to] of ODD) s = s.replace(re, to); return s.replace(/ {2,}/g, ' '); }
+function cleanBook(b) {
+  for (const k of ['title', 'subtitle', 'author']) if (b[k]) b[k] = cleanText(b[k]).trim();
+  for (const ch of b.chapters) {
+    if (ch.title) ch.title = cleanText(ch.title).trim();
+    for (const bl of ch.blocks) if (bl.runs) for (const r of bl.runs) r.text = cleanText(r.text);
+  }
+}
+// Drops the few symbols the print fonts lack (a ✓ or ★), so they never block the paperback.
+function dropChars(b, chars) {
+  const re = new RegExp(`[${chars.map((c) => c.replace(/[\]\\^-]/g, '\\$&')).join('')}]`, 'gu');
+  const fix = (t) => String(t || '').replace(re, '');
+  for (const k of ['title', 'subtitle', 'author']) if (b[k]) b[k] = fix(b[k]);
+  for (const ch of b.chapters) {
+    if (ch.title) ch.title = fix(ch.title);
+    for (const bl of ch.blocks) if (bl.runs) for (const r of bl.runs) r.text = fix(r.text);
+  }
 }
 
 function safeName(s) {
@@ -98,9 +121,19 @@ async function buildAll(book, opts, onProgress = () => {}) {
   const base = safeName(b.title) + (opts.translate?.target ? ` (${opts.translate.target})` : '');
 
   // Pick a font that has every letter in the book.
+  cleanBook(b);
   let family = opts.font === 'noto' ? 'noto' : 'crimson';
   let cover = missingGlyphs(b, family);
   if (cover.missing && family === 'crimson') { family = 'noto'; cover = missingGlyphs(b, 'noto'); }
+  // only symbols missing (no letters): leave them out of the print book instead of skipping it
+  let printBook = b;
+  if (cover.missing && !cover.letters.length && !rtl) {
+    const shown = cover.chars.map((c) => `"${c}" (U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`).join(', ');
+    printBook = JSON.parse(JSON.stringify(b)); // the eBook and Word file keep them
+    dropChars(printBook, cover.chars);
+    notes.push(`The paperback leaves out ${cover.chars.length === 1 ? 'one symbol' : 'a few symbols'} its fonts can't print: ${shown}. The eBook and Word file keep ${cover.chars.length === 1 ? 'it' : 'them'}.`);
+    cover = missingGlyphs(printBook, family);
+  }
 
   let pageCount = 200;
   let pdfMade = false;
@@ -108,7 +141,7 @@ async function buildAll(book, opts, onProgress = () => {}) {
     notes.push('The print PDF was skipped: this language uses letters our print fonts do not have yet. The EPUB and Word files are ready, and Word can make a PDF from the .docx (File > Save As > PDF).');
   } else {
     onProgress('Making the print PDF', 0);
-    const pdf = await makePdf(b, { ...opts, font: family, lang });
+    const pdf = await makePdf(printBook, { ...opts, font: family, lang });
     pageCount = pdf.pageCount;
     pdfMade = true;
     files.push({ name: `${base} - paperback ${opts.trim || '6x9'}.pdf`, buffer: pdf.buffer, kind: 'pdf' });

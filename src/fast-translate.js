@@ -164,6 +164,22 @@ function sentences(t) {
   });
 }
 
+// The translators learned from text with straight quotes: curly ones confuse them
+// (they come back as stray dashes and dots). Straight in, curly again after.
+const forModel = (t) => t.replace(/[“”„‟«»]/g, '"').replace(/[‘’‚‛]/g, '\'').replace(/\u2026/g, '...');
+const STRAY = /^[\s\-–—.,;:]+(?=\p{L}|["'(¿¡])/u;
+function fromModel(out, src) {
+  let t = String(out || '')
+    .replace(/\u2581/g, ' ').replace(/\u2047/g, ' ')        // translator markers
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')            // invisible characters
+    .replace(/[\u2009\u202F]/g, '\u00A0').replace(/\u2028/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  if (!/^[\s\-–—.,;:]/.test(src)) t = t.replace(STRAY, ''); // a dash or dot the source didn't start with
+  const { tidyRuns } = require('./read');
+  const runs = tidyRuns([{ text: t, i: false, b: false }]);
+  return runs.length ? runs.map((r) => r.text).join('') : t;
+}
+
 // texts: plain strings (one paragraph each). Returns the translated strings.
 async function translatePlain(texts, src, tgt, { modelsDir, onStatus = () => {}, onProgress = () => {}, languageName } = {}) {
   if (!texts.length) return [];
@@ -182,8 +198,8 @@ async function translatePlain(texts, src, tgt, { modelsDir, onStatus = () => {},
   const jobs = [];
   for (let i = 0; i < list.length; i += CHUNK) {
     const part = list.slice(i, i + CHUNK);
-    jobs.push(w.ask({ model: dir, src: pick.code ? pick.code(src) : src, tgt: pick.code ? pick.code(tgt) : tgt, prefix: pick.prefix, sentences: part })
-      .then((ans) => { ans.out.forEach((t, k) => { out[i + k] = t; }); done += part.length; onProgress(Math.min(1, done / list.length)); }));
+    jobs.push(w.ask({ model: dir, src: pick.code ? pick.code(src) : src, tgt: pick.code ? pick.code(tgt) : tgt, prefix: pick.prefix, sentences: part.map(forModel) })
+      .then((ans) => { ans.out.forEach((t, k) => { out[i + k] = fromModel(t, part[k]); }); done += part.length; onProgress(Math.min(1, done / list.length)); }));
   }
   await Promise.all(jobs);
   return plan.map((ids) => ids.map((k) => out[k]).join(' '));
@@ -198,4 +214,4 @@ function fastLanguageCodes(modelsDir) {
   } catch { return null; }
 }
 
-module.exports = { translatePlain, sentences, stopWorker, getManifest, fastLanguageCodes, MODELS_URL };
+module.exports = { translatePlain, fromModel, forModel, sentences, stopWorker, getManifest, fastLanguageCodes, MODELS_URL };

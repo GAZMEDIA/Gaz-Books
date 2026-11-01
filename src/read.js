@@ -277,4 +277,4 @@ function findAll(n, name, out = []) {
   return out;
 }
 
-module.exports = { readManuscript, htmlToBook, plain };
+module.exports = { readManuscript, htmlToBook, plain, tidyRuns };
