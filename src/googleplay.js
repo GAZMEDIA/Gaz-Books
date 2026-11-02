@@ -31,7 +31,9 @@ const cell = (v) => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ');
 
 // editions: from quick.js (code, name, dir, base, pages, files, words: { desc, bio }, title, subtitle, author)
 // isbns: { en: '978…', fr: '978…' } (eBook ISBNs, optional)
-function writeGooglePlay(folder, editions, { genre, isbns = {}, publisher = '' } = {}) {
+// genres: [{ code, name }] (7, from src/genres.js); falls back to one code per kind of book
+function writeGooglePlay(folder, editions, { genre, genres = [], isbns = {}, publisher = '' } = {}) {
+  const list = genres.length ? genres : (BISAC[genre] ? [{ code: BISAC[genre], name: '' }] : []);
   const gp = path.join(folder, 'Google Play Books');
   fs.rmSync(gp, { recursive: true, force: true });
   fs.mkdirSync(gp, { recursive: true });
@@ -54,7 +56,7 @@ function writeGooglePlay(folder, editions, { genre, isbns = {}, publisher = '' }
       const cover = find(e, 'Kindle cover.jpg');
       if (cover) fs.copyFileSync(cover, path.join(up, `${id}.jpg`));
       rows.push([id, 'Yes', e.title, e.subtitle, 'Digital', `${e.author} [Author]`, html(e.words.bio), ISO3[e.code] || e.code,
-        BISAC[genre] ? `${BISAC[genre]} [BISAC]` : '', genre === 'children' ? '3-8' : '18+', html(e.words.desc), today, e.pages, publisher || e.author]);
+        list.map((g) => `${g.code} [BISAC]`).join('; '), genre === 'children' ? '3-8' : '18+', html(e.words.desc), today, e.pages, publisher || e.author]);
     }
     // Google wants tab-separated text in UTF-16
     const tsv = rows.map((r) => r.map(cell).join('\t')).join('\r\n');
@@ -76,7 +78,9 @@ function writeGooglePlay(folder, editions, { genre, isbns = {}, publisher = '' }
       `Author (Contributor, role "Author"): ${e.author}`,
       `Language: ${e.name}`,
       'Book format: Digital',
-      BISAC[genre] ? `Subject (BISAC): ${BISAC[genre]}` : null,
+      list.length ? '' : null,
+      list.length ? 'GENRES (on the "Genres" page: keep "BISAC (North America)", type the code, pick the matching name; press "+ Add a genre" for the next)' : null,
+      ...list.map((g, i) => `${i + 1}. ${g.code}  ${g.name}`),
       `Page count: ${e.pages}`,
       '',
       'DESCRIPTION',
@@ -113,7 +117,7 @@ function guide(withIsbn, without) {
       'For each language folder:',
       '1. Click "Book catalog", then "Add book".',
       '2. Choose to add an ebook, and when asked for an ISBN, pick the option for a book without one. Google gives it a free ID.',
-      '3. Copy the details from "Book details (copy into Google).txt": title, author, language, description, subject.',
+      '3. Copy the details from "Book details (copy into Google).txt": title, author, language, description, and the 7 genres (Genres page).',
       '4. On the "Content" page, upload the .epub file and the cover .jpg from that folder.',
       '5. On the "Pricing" page, add your price. Then click "Publish".',
       '');
