@@ -1,0 +1,8 @@
+node_modules/
+dist/
+test/out/
+test/sample.*
+test/*.log
+__pycache__/
+*.pyc
+build/python/

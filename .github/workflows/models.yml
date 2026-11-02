@@ -1,0 +1,59 @@
+name: Build translator files
+
+# Run by hand (Actions > Build translator files > Run workflow) when languages
+# are added or improved. Converts free, open models (OPUS-MT, M2M100) for
+# GazBook's on-computer translator and puts them on the "models-v1" release
+# of this repository, where GazBook downloads each language the first time
+# it is used. Nothing here costs money.
+on:
+  # also runs by itself when the list of models changes
+  push:
+    branches: ['claude/**', main]
+    paths: ['translator/build_models.py', '.github/workflows/models.yml']
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Only these language codes (space separated, "m2m" for the backup). Empty = all.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+# one build at a time; a newer one replaces an older one still running
+concurrency:
+  group: translator-files
+  cancel-in-progress: true
+
+jobs:
+  models:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the converter
+        run: pip install ctranslate2 sentencepiece "transformers[sentencepiece]" huggingface_hub torch --extra-index-url https://download.pytorch.org/whl/cpu
+      - name: Convert the models
+        run: python translator/build_models.py out ${{ github.event.inputs.only }}
+      - name: Put them on the models-v1 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view models-v1 >/dev/null 2>&1 || gh release create models-v1 --title "GazBook translator files" \
+            --notes "Language files for GazBook's on-computer translator. GazBook downloads each language once, the first time it is used. Models: OPUS-MT (University of Helsinki, CC-BY 4.0) and M2M100 (Meta, MIT), converted to CTranslate2."
+          if [ -n "${{ github.event.inputs.only }}" ]; then
+            # keep the other languages: merge into the manifest already on the release
+            gh release download models-v1 -p manifest.json -O old-manifest.json || echo '{"languages":{},"models":{},"fallback":null}' > old-manifest.json
+            python - <<'PY'
+          import json
+          old = json.load(open("old-manifest.json")); new = json.load(open("out/manifest.json"))
+          old.setdefault("languages", {}).update(new["languages"]); old.setdefault("models", {}).update(new["models"])
+          old["fallback"] = new.get("fallback") or old.get("fallback")
+          json.dump(old, open("out/manifest.json", "w"), indent=1)
+          PY
+          fi
+          cd out && gh release upload models-v1 *__* manifest.json build-log.txt --clobber
+          cat build-log.txt >> "$GITHUB_STEP_SUMMARY"

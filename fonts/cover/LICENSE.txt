@@ -1,0 +1,3 @@
+These fonts are free software under the SIL Open Font License 1.1 (https://openfontlicense.org).
+They come from the Fontsource project (https://fontsource.org), which packages Google Fonts.
+Playfair Display, Cinzel, Cormorant Garamond, EB Garamond, Libre Baskerville, DM Serif Display, Bodoni Moda, Abril Fatface, Merriweather, Lora, Marcellus, Bebas Neue, Anton, Oswald, Archivo Black, Montserrat, Poppins, Raleway, Josefin Sans, League Spartan, Great Vibes, Dancing Script.

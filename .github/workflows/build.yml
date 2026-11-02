@@ -1,0 +1,82 @@
+name: Build GazBook
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ctranslate2 sentencepiece numpy
+      # The one-minute promise: 50,000 words into French, German and Spanish, with all files
+      # Reports the time; does not stop the installer from being built
+      - name: Speed check (3 languages)
+        continue-on-error: true
+        run: node test/speed.js "fr de es" 60 | tee speed.txt; cat speed.txt | tail -8 >> "$GITHUB_STEP_SUMMARY"
+      - name: Check the EPUB with the official EPUBCheck
+        run: |
+          curl -sSL -o epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.1.0/epubcheck-5.1.0.zip
+          unzip -q epubcheck.zip
+          java -jar epubcheck-5.1.0/epubcheck.jar test/sample.epub
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm run dist
+      # Saved as a release (not an Actions artifact) so the installer is easy to download.
+      - name: Publish installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="gazbook-${{ github.run_number }}"
+          gh release create "$TAG" dist/GazBook-Setup-*.exe \
+            --target "${{ github.sha }}" --prerelease \
+            --title "GazBook build ${{ github.run_number }} (${GITHUB_REF_NAME})" \
+            --notes "Windows installer built from ${GITHUB_REF_NAME} at ${{ github.sha }}."
+      # The translator inside the installer, on Windows, against the time limit
+      - name: Speed check with the bundled translator
+        continue-on-error: true
+        shell: bash
+        run: |
+          pip install ctranslate2 sentencepiece numpy
+          GAZBOOK_PYTHON="$PWD/build/python/python.exe" node test/speed.js "fr de" 60
+      # The real language files on the models-v1 release (skipped until "Build translator files" has run)
+      - name: Check the real translator
+        shell: bash
+        run: GAZBOOK_PYTHON="$PWD/build/python/python.exe" node test/offline-translate.js "$RUNNER_TEMP/models"
+      # GazBook's built-in AI: download it, write a listing, then check the installed app can run it too.
+      - name: Check the built-in AI
+        run: node test/local-ai.js "$env:RUNNER_TEMP\ai"
+      - name: Check the built-in AI inside the installed app
+        shell: bash
+        env:
+          GAZBOOK_MODEL_DIR: ${{ runner.temp }}\ai
+        run: ./dist/win-unpacked/GazBook.exe --selftest-local-ai
