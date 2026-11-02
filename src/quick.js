@@ -15,6 +15,7 @@ const kit = require('./kit-offline');
 const { writeGooglePlay } = require('./googleplay');
 const ideas = require('./book-ideas');
 const coverDesign = require('./cover-design');
+const { suggestGenres } = require('./genres');
 
 // The first two or three sentences (about 55 words): the bio on the back cover.
 function shortBio(text) {
@@ -137,13 +138,13 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     report(code, `${lang.name} ready`, 1);
   }
   // the zip and the Google Play folder are made by finish(), after "Check before printing"
-  return { folder, zipPath: path.join(folder, `${safeName(book.title)}.zip`), editions, genre, isbns: opts.isbns || {}, prompt, designRequest, wordsPrompt, promptFile, notes,
+  return { folder, zipPath: path.join(folder, `${safeName(book.title)}.zip`), editions, genre, isbns: opts.isbns || {}, prompt, designRequest, wordsPrompt, promptFile, notes, genres: suggestGenres(book, genre),
     trim: opts.trim || '6x9', source, aboutAuthor: a, suggestion: kit.pullQuote(book), seconds: (Date.now() - t0) / 1000 };
 }
 
 // The last stage: every language ready for Google Play too, and everything in one zip.
 async function finish(res) {
-  writeGooglePlay(res.folder, res.editions, { genre: res.genre, isbns: res.isbns });
+  writeGooglePlay(res.folder, res.editions, { genre: res.genre, genres: res.genres, isbns: res.isbns });
   fs.rmSync(res.zipPath, { force: true });
   res.zipPath = await zipAll(res.folder, path.basename(res.zipPath, '.zip'));
   res.finished = true;
