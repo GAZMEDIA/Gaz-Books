@@ -8,6 +8,7 @@ const { readBook, safeName } = require('../src/engine');
 const { makeEverything, drawCovers, backCover, updateBack, finish, blanks } = require('../src/quick');
 const { writeGooglePlay, isbnOk, PARTNER_CENTER } = require('../src/googleplay');
 const coverDesign = require('../src/cover-design');
+const marketingKit = require('../src/marketing-kit');
 const { KDP_LANGUAGES } = require('../src/kdp-languages');
 const { offlineTranslate, modelsDir } = require('./offline-main');
 const { fastLanguageCodes, getManifest } = require('../src/fast-translate');
@@ -18,6 +19,7 @@ const GEMINI_WEB = 'https://gemini.google.com/app';
 module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, renderCover, saveAsJpeg, previewCover }) {
   let current = null; // { book, file, summary }
   let last = null; // the last result, so the covers can be redrawn with the picture
+  let kitFiles = []; // the author's own marketing kit (Word, PDF or text files)
 
   const send = (d) => { const w = getWin(); if (w && !w.isDestroyed()) w.webContents.send('quick-progress', d); };
 
@@ -40,6 +42,30 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     return r.canceled || !r.filePaths[0] ? null : open(r.filePaths[0]);
   });
   ipcMain.handle('quick-open-book', (_e, file) => open(file));
+
+  // ------------------------------------------------------------ the author's marketing kit
+
+  // One file or several; each new file adds to the kit (a part comes from the first file that has it).
+  async function addKit(files) {
+    const ok = files.filter((f) => /\.(docx|pdf|txt|md)$/i.test(f));
+    if (!ok.length) throw new Error('GazBook reads marketing kits saved as Word (.docx), PDF or text files.');
+    kitFiles = [...new Set([...kitFiles, ...ok])];
+    return kitNow();
+  }
+  async function kitNow() {
+    if (!kitFiles.length) return null;
+    const k = await marketingKit.readKit(kitFiles);
+    const f = marketingKit.found(k);
+    if (!f.has.length) throw new Error('GazBook could not find a description, cover prompt, keywords or categories in that file. Check it has headings such as "Description", "Keywords" and "Categories".');
+    return { ...f, title: k.title, subtitle: k.subtitle, series: k.series, bio: k.bio, tagline: k.tagline, files: k.files,
+      coverPrompt: k.coverPrompt, keywords: k.keywords, categories: k.categories, description: k.description };
+  }
+  ipcMain.handle('quick-pick-kit', async () => {
+    const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your marketing kit (you can pick several files)', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Marketing kit', extensions: ['docx', 'pdf', 'txt', 'md'] }] });
+    return r.canceled || !r.filePaths.length ? null : addKit(r.filePaths);
+  });
+  ipcMain.handle('quick-drop-kit', (_e, files) => addKit(files));
+  ipcMain.handle('quick-clear-kit', () => { kitFiles = []; return null; });
 
   // ------------------------------------------------------------ author photo
 
@@ -110,7 +136,8 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
       if (!isbnOk(v)) throw new Error(`"${m[2].trim()}" is not a valid ISBN. It should be 13 digits starting with 978 or 979.`);
       isbns[m[1].toLowerCase()] = v;
     }
-    const res = await makeEverything(current.book, { ...o, isbns, folder }, {
+    const kit = kitFiles.length ? await marketingKit.readKit(kitFiles) : null;
+    const res = await makeEverything(current.book, { ...o, isbns, folder, kit }, {
       offline: (texts, src, tgt, onPart) => offlineTranslate(texts, src, tgt, { onStatus: (msg) => send({ step: msg, p: -1 }), onProgress: onPart }),
       renderCover,
     }, send);
@@ -128,6 +155,7 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
     folder: res.folder, zip: res.zipPath, seconds: res.seconds, genre: res.genre, notes: res.notes,
     editions: res.editions.map((e) => ({ code: e.code, name: e.name, pages: e.pages, printMade: e.printMade, files: e.files.map((f) => path.basename(f)) })),
     back: backCover(res),
+    fromKit: !!res.fromKit, kitPrompt: res.fromKit && res.prompt !== res.designRequest ? res.prompt : '',
     blanks: blanks(res),
     finished: !!res.finished,
     kindleCover: res.editions[0] ? `data:image/jpeg;base64,${fs.readFileSync(path.join(res.editions[0].dir, `${res.editions[0].base} - Kindle cover.jpg`)).toString('base64')}` : '',
@@ -178,8 +206,9 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
 
   // The no-words picture from Gemini (+ the design card): every language's covers
   // are drawn with the same art, fonts, colours and places.
-  async function drawAll(card) {
-    const design = coverDesign.readCard(card);
+  // ready: the picture is a finished front cover with the title and name already on it
+  async function drawAll(card, ready) {
+    const design = ready ? null : coverDesign.readCard(card);
     const pic = last.coverPic;
     let bg; let ink = '#ffffff';
     if (!design) { // no card: the back takes a deep colour from the picture
@@ -187,35 +216,40 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
       bg = `#${[avg[2], avg[1], avg[0]].map((v) => Math.round(v * 0.35).toString(16).padStart(2, '0')).join('')}`;
     }
     let n = 0;
+    const others = [];
     for (const ed of last.editions) {
+      // a finished cover has the original's words on it: it is used for the original language only
+      if (ready && ed.code !== last.source) { others.push(ed.name); continue; }
       send({ step: `Drawing the ${ed.name} covers`, p: n++ / last.editions.length });
-      await drawCovers(ed, renderCover, { image: pic.path, imageMode: 'front', design: design || null, ...(design ? {} : { bg, ink }) });
+      await drawCovers(ed, renderCover, { image: pic.path, imageMode: 'front', design: design || null, frontReady: !!ready, ...(design ? {} : { bg, ink }) });
     }
     last.design = design;
     last.finished = false; // the zip is made again at "Finish my books"
     send({ step: 'Covers ready', p: 1 });
     const sharpW = 1838; // pixels across the front for a sharp 6x9 print
     const notes = [];
+    if (others.length) notes.push(`Your finished cover has the words in your original language, so it is used for that book only. ${others.join(', ')} keep${others.length === 1 ? 's' : ''} GazBook's cover in ${others.length === 1 ? 'its' : 'their'} own language.`);
+    if (ready) notes.push('The back cover and spine are made by GazBook to match. Check that your title and name are not too close to the edges of the front.');
     if (pic.w < sharpW * 0.66) notes.push('This picture is a little small for a sharp paperback cover. If you can, ask Gemini for the same picture "in high resolution".');
     if (card && card.trim() && !design) notes.push('GazBook could not read that design card, so it used its own simple style. Paste the lines that start with TITLE:, SUBTITLE:, AUTHOR: and BACK:.');
     for (const e of design ? [design.title, design.subtitle, design.author].filter(Boolean) : []) if (!e.fontKnown && e.asked) notes.push(`Gemini used "${e.asked}", which GazBook doesn't have; it used ${e.font}, the closest.`);
     return withWrap({ ...summary(last), warn: notes.join(' '), understood: coverDesign.describe(design) });
   }
-  async function usePicture(file, card) {
+  async function usePicture(file, card, ready) {
     if (!last) throw new Error('Make your books first, then add the cover picture.');
     const ext = path.extname(file).slice(1).toLowerCase();
     last.coverPic = await saveAsJpeg(fs.readFileSync(file), `image/${ext === 'jpg' ? 'jpeg' : ext}`);
-    return drawAll(card);
+    return drawAll(card, ready);
   }
   ipcMain.handle('quick-apply-design', (_e, card) => {
     if (!last || !last.coverPic) throw new Error('First put in the picture WITHOUT words from Gemini (step 3).');
     return drawAll(card);
   });
-  ipcMain.handle('quick-pick-picture', async (_e, card) => {
-    const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your cover picture', properties: ['openFile'], filters: [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
-    return r.canceled || !r.filePaths[0] ? null : usePicture(r.filePaths[0], card);
+  ipcMain.handle('quick-pick-picture', async (_e, card, ready) => {
+    const r = await dialog.showOpenDialog(getWin(), { title: ready ? 'Choose your finished front cover' : 'Choose your cover picture', properties: ['openFile'], filters: [{ name: 'Pictures', extensions: ['jpg', 'jpeg', 'png', 'webp'] }] });
+    return r.canceled || !r.filePaths[0] ? null : usePicture(r.filePaths[0], card, ready);
   });
-  ipcMain.handle('quick-drop-picture', (_e, file, card) => usePicture(file, card));
+  ipcMain.handle('quick-drop-picture', (_e, file, card, ready) => usePicture(file, card, ready));
   // "Check your back cover": new words or photo, every language redone
   ipcMain.handle('quick-update-back', async (_e, vals) => {
     if (!last) throw new Error('Make your books first.');

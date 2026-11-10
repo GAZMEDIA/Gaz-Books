@@ -7,6 +7,7 @@ let photo = null;
 let languages = [];
 let result = null;
 let settings = {};
+let kit = null; // the author's own marketing kit, as GazBook read it
 
 const clean = (m) => String(m || '').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 function showError(m) { $('error').textContent = clean(m); $('error').classList.toggle('hidden', !m); }
@@ -47,6 +48,7 @@ function gotBook(s) {
   $('aboutAuthor').value = s.aboutAuthorText || '';
   $('aboutBook').value = s.aboutBook || '';
   setPhoto(s.photo);
+  if (kit) gotKit(kit); // a kit put in before the book
 }
 function setPhoto(p) {
   photo = p || null;
@@ -58,6 +60,25 @@ function setPhoto(p) {
 }
 dropZone($('bookDrop'), (f) => run(() => q.dropBook(f)).then(gotBook), () => run(() => q.pickBook()).then(gotBook));
 dropZone($('photoDrop'), (f) => run(() => q.dropPhoto(f)).then((p) => p && setPhoto(p)), () => run(() => q.pickPhoto()).then((p) => p && setPhoto(p)));
+// ---- the author's marketing kit
+function gotKit(k) {
+  kit = k || null;
+  $('kitFound').classList.toggle('hidden', !kit);
+  $('kitDrop').classList.toggle('hidden', !!kit);
+  $('aboutBookBox').classList.toggle('hidden', !!(kit && kit.description));
+  if (!kit) return;
+  $('kitHas').textContent = `✓ GazBook will use, exactly as you wrote them: ${kit.has.join(', ')}.`;
+  $('kitMissing').textContent = kit.missing.length ? `GazBook will make the rest for you: ${kit.missing.join(', ')}.` : 'Your kit is complete. GazBook will not change any of it.';
+  $('kitFiles').textContent = `From: ${kit.files.join(', ')}`;
+  // fill empty boxes from the kit (the author can still change them)
+  if (kit.title && (!$('title').value.trim() || (book && $('title').value === (book.title || '')))) { $('title').value = kit.title; $('title').oninput(); }
+  if (kit.subtitle && !$('subtitle').value.trim()) { $('subtitle').value = kit.subtitle; $('subtitle').oninput(); }
+  if (kit.bio && !$('aboutAuthor').value.trim()) $('aboutAuthor').value = kit.bio;
+}
+dropZone($('kitDrop'), () => {}, () => run(() => q.pickKit()).then((k) => k && gotKit(k)));
+$('kitDrop').ondrop = (e) => { e.preventDefault(); $('kitDrop').classList.remove('over'); if (e.dataTransfer.files.length) run(() => q.dropKit(e.dataTransfer.files)).then((k) => k && gotKit(k)); };
+$('kitAdd').onclick = () => run(() => q.pickKit()).then((k) => k && gotKit(k));
+$('kitClear').onclick = () => run(() => q.clearKit()).then(() => gotKit(null));
 $('title').oninput = () => { $('fTitle').textContent = $('title').value; };
 $('author').oninput = () => { $('fBy').textContent = $('author').value ? `, by ${$('author').value}` : ''; };
 $('subtitle').oninput = () => { $('fSub').textContent = $('subtitle').value ? `Subtitle: ${$('subtitle').value}` : ''; };
@@ -138,6 +159,8 @@ function done(r) {
   $('bStatus').textContent = ''; $('wordsCopied').classList.add('hidden');
   $('card').value = ''; $('understood').textContent = ''; $('applyCard').classList.add('hidden');
   loadIdeas();
+  $('kitCover').classList.toggle('hidden', !r.kitPrompt);
+  $('kitCopied').classList.add('hidden');
   show(3);
 }
 $('back3').onclick = () => show(2);
@@ -206,6 +229,8 @@ async function picture(fn) {
   $('picWarn').className = r.warn ? 'warn' : 'success';
 }
 dropZone($('picDrop'), (f) => picture(() => q.dropPicture(f, $('card').value)), () => picture(() => q.pickPicture($('card').value)));
+dropZone($('readyDrop'), (f) => picture(() => q.dropPicture(f, '', true)), () => picture(() => q.pickPicture('', true)));
+$('copyKitPrompt').onclick = () => run(() => q.copy(result && result.kitPrompt)).then(() => $('kitCopied').classList.remove('hidden'));
 $('applyCard').onclick = () => picture(() => q.applyDesign($('card').value));
 
 // ---------------------------------------------------------------- back cover

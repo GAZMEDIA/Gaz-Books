@@ -23,6 +23,22 @@ languages) you get one folder and one zip with, for every language:
   GazBook redraws that design (art, fonts, colours, places) in every language
 - a "words" request for Gemini (catchy descriptions, taglines, keywords)
 
+### Your own marketing kit (new in 1.7)
+
+Already have a marketing kit (Amazon description, cover prompt, keywords,
+categories, about the author) in Word, PDF or text, in one file or several?
+Put it in at step 1 ("Your marketing kit"). GazBook finds each part by its
+heading and uses it **exactly as written**: the description goes on Amazon word
+for word (its opening paragraphs, up to about 170 words, go on the back
+cover), the keywords are packed into Amazon's 7 boxes of 50 characters (the
+rest are listed as extra keywords for Google Play and Kobo), the first 3
+categories are for upload and the rest are listed to ask Amazon to add, and
+the cover prompt is saved as is and offered with a Copy button. Only the
+parts the kit does not have are made by GazBook. For other languages the
+kit's description and keywords are translated. At step 3, "Already have a
+finished front cover?" puts a cover that already shows the title and name on
+the front unchanged, with a matching spine and back (original language only).
+
 No keys and no fees: translation runs on the computer (`translator/`,
 CTranslate2 with free OPUS-MT and M2M100 models). Each language is
 downloaded once from this repository's `models-v1` release, made by the

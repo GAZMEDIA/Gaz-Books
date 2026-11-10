@@ -44,6 +44,18 @@
     </div>
 
     <section class="card">
+      <h2>Your marketing kit <span class="opt">(if you have one: GazBook uses it exactly as written)</span></h2>
+      <p class="hint">Already have your Amazon description, keywords, categories or cover prompt in a Word, PDF or text file? Put it here. GazBook uses every part you give, word for word, and only makes the parts you don't have. No kit? Skip this: GazBook makes one for you.</p>
+      <div class="drop small" id="kitDrop" tabindex="0" role="button" aria-label="Add your marketing kit"><b>📄 Put your marketing kit here</b><br><span class="hint">drag the file(s) here or click. One file or several.</span></div>
+      <div id="kitFound" class="hidden">
+        <p class="success" id="kitHas"></p>
+        <p class="hint" id="kitMissing"></p>
+        <p class="hint" id="kitFiles"></p>
+        <button class="ghost" id="kitAdd">Add another file</button> <button class="link" id="kitClear">Remove the kit</button>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>About the author <span class="opt">(goes on the back cover and the last page of every book)</span></h2>
       <div class="author">
         <div class="photo" id="photoDrop" tabindex="0" role="button" aria-label="Add your photo">
@@ -55,7 +67,7 @@
         </label>
       </div>
       <p class="warn hidden" id="photoWarn"></p>
-      <label>What is your book about? <span class="opt">(the description on the back cover and on Amazon; you can also write it later, at "Check before printing")</span>
+      <label id="aboutBookBox">What is your book about? <span class="opt">(the description on the back cover and on Amazon; you can also write it later, at "Check before printing")</span>
         <textarea id="aboutBook" rows="4"></textarea>
       </label>
       <p class="hint">GazBook remembers this for your next book.</p>
@@ -120,6 +132,14 @@
           <li><div class="drop small" id="picDrop" tabindex="0" role="button" aria-label="Add the picture without words"><b>4. Put the picture WITHOUT words here</b><br><span class="hint">drag it here or click</span></div>
             <button class="ghost hidden" id="applyCard">Use the changed design card</button></li>
         </ol>
+        <div id="kitCover" class="hidden">
+          <h3>Your own cover prompt (from your marketing kit)</h3>
+          <p class="hint">Paste it into your picture app (Gemini, ChatGPT, Midjourney…) exactly as you wrote it.</p>
+          <button class="primary" id="copyKitPrompt">Copy my cover prompt</button> <span class="done hidden" id="kitCopied">Copied!</span>
+        </div>
+        <h3>Already have a finished front cover?</h3>
+        <p class="hint">A picture that already shows your title and name. GazBook puts it on the front exactly as it is and makes the spine and back cover to match.</p>
+        <div class="drop small" id="readyDrop" tabindex="0" role="button" aria-label="Add your finished front cover"><b>Put my finished front cover here</b><br><span class="hint">drag it here or click</span></div>
         <p class="warn hidden" id="picWarn"></p>
       </div>
     </div>

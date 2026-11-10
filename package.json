@@ -1,6 +1,6 @@
 {
   "name": "gazbook",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "Format books for Amazon KDP in under a minute: translated paperback PDF, Kindle EPUB, Word, covers and marketing kit.",
   "main": "app/main.js",
   "scripts": {

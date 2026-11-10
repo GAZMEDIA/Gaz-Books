@@ -56,7 +56,7 @@ function writeGooglePlay(folder, editions, { genre, genres = [], isbns = {}, pub
       const cover = find(e, 'Kindle cover.jpg');
       if (cover) fs.copyFileSync(cover, path.join(up, `${id}.jpg`));
       rows.push([id, 'Yes', e.title, e.subtitle, 'Digital', `${e.author} [Author]`, html(e.words.bio), ISO3[e.code] || e.code,
-        list.map((g) => `${g.code} [BISAC]`).join('; '), genre === 'children' ? '3-8' : '18+', html(e.words.desc), today, e.pages, publisher || e.author]);
+        list.map((g) => `${g.code} [BISAC]`).join('; '), genre === 'children' ? '3-8' : '18+', html(e.words.amazonDesc || e.words.desc), today, e.pages, publisher || e.author]);
     }
     // Google wants tab-separated text in UTF-16
     const tsv = rows.map((r) => r.map(cell).join('\t')).join('\r\n');
@@ -84,7 +84,7 @@ function writeGooglePlay(folder, editions, { genre, genres = [], isbns = {}, pub
       `Page count: ${e.pages}`,
       '',
       'DESCRIPTION',
-      e.words.desc,
+      e.words.amazonDesc || e.words.desc,
       '',
       e.words.bio ? 'ABOUT THE AUTHOR (Biographical note)' : null,
       e.words.bio || null,

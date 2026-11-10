@@ -80,7 +80,8 @@ function designCss(D, s) {
 
 // spec: { size, title, subtitle, author, tagline, blurb, bio, authorPhoto (data URL), image (file path or data URL),
 //         imageMode: 'wrap' | 'front', bg, ink, style, guides,
-//         design (from a Gemini design card: fonts, colours, places; src/cover-design.js) }
+//         design (from a Gemini design card: fonts, colours, places; src/cover-design.js),
+//         frontReady (the picture is a finished front cover with its own words: nothing is written on it) }
 function coverHtml(spec) {
   const s = spec.size;
   const st = STYLES[spec.style] || STYLES.classic;
@@ -137,7 +138,7 @@ ${img && !wrap ? `<div class="art" style="left:${s.front.x}in;width:${s.front.w}
 </div>
 <div class="panel spine" style="left:${s.spineBox.x}in;width:${s.spine}in">${spineWords ? `<div class="w">${spineWords}</div>` : ''}</div>
 <div class="panel front" style="left:${s.front.x}in;width:${s.front.w}in">
-${D ? designedFront(spec, D) : `  ${img ? '<div class="shade"></div>' : ''}
+${spec.frontReady && img ? '' : D ? designedFront(spec, D) : `  ${img ? '<div class="shade"></div>' : ''}
   <div class="t"><h1>${esc(spec.title)}</h1>${spec.subtitle ? `<h2>${esc(spec.subtitle)}</h2>` : ''}</div>
   <div class="a">${esc(spec.author)}</div>`}
 </div>
