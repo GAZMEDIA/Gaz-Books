@@ -63,7 +63,8 @@ require('./mksample');
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
   const pub = publicKey.export({ type: 'spki', format: 'pem' });
   const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  const b58 = (buf) => { let n = BigInt(`0x${buf.toString('hex')}`); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; };
+  // standard base58: each leading zero byte is a "1" (a signature starting with 0x00 happens 1 time in 256)
+  const b58 = (buf) => { let n = BigInt(`0x${buf.toString('hex')}`); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return '1'.repeat(buf.length - buf.toString('hex').replace(/^(00)*/, '').length / 2) + o; };
   const make = (email, L, ymd) => `${L}${ymd}-${b58(crypto.sign(null, Buffer.from(`gazbook-plan-v1|${email}|${L}|${ymd}`), privateKey)).match(/.{1,8}/g).join('-')}`;
   const code = make('jo@example.com', 'W', '20271027');
   assert.deepStrictEqual(lic.readCode(' Jo@Example.com ', code, pub).features, ['format', 'cover']);
