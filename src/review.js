@@ -257,7 +257,7 @@ function fileChecks({ pageCount, trim = '6x9', paper = 'white', pdfMade, cover }
   }
   if (cover) {
     const s = coverSize({ trim, pages: pageCount, paper });
-    ok.push(`Paperback cover: ${s.width} x ${s.height} in with 0.125 in bleed, spine ${s.spine} in for ${s.pages} pages on ${s.paperName} paper${s.spineText ? '' : ' (too thin for spine text, so the spine is left plain as Amazon requires)'}.`);
+    ok.push(`Paperback cover: ${s.width} x ${s.height} in with 0.125 in bleed, spine ${s.spine} in for ${s.pages} pages on ${s.paperName} paper${s.spineText ? ', spine words kept at least 0.375 in from the top and bottom edges' : ' (too thin for spine text, so the spine is left plain as Amazon requires)'}.`);
     ok.push('Kindle cover: 1600 pixels wide, JPG, at Amazon\'s 1.6 height-to-width ratio.');
   } else {
     fix.push('No cover was made in GazBook for this book. Check your own cover with Amazon\'s cover calculator for this page count.');

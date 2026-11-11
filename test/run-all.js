@@ -63,7 +63,8 @@ require('./mksample');
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
   const pub = publicKey.export({ type: 'spki', format: 'pem' });
   const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  const b58 = (buf) => { let n = BigInt(`0x${buf.toString('hex')}`); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return o; };
+  // standard base58: each leading zero byte is a "1" (a signature starting with 0x00 happens 1 time in 256)
+  const b58 = (buf) => { let n = BigInt(`0x${buf.toString('hex')}`); let o = ''; while (n > 0n) { o = A[Number(n % 58n)] + o; n /= 58n; } return '1'.repeat(buf.length - buf.toString('hex').replace(/^(00)*/, '').length / 2) + o; };
   const make = (email, L, ymd) => `${L}${ymd}-${b58(crypto.sign(null, Buffer.from(`gazbook-plan-v1|${email}|${L}|${ymd}`), privateKey)).match(/.{1,8}/g).join('-')}`;
   const code = make('jo@example.com', 'W', '20271027');
   assert.deepStrictEqual(lic.readCode(' Jo@Example.com ', code, pub).features, ['format', 'cover']);
@@ -93,5 +94,43 @@ require('./mksample');
   const xml = await (await require('jszip').loadAsync(kitDoc)).file('word/document.xml').async('string');
   assert.ok(xml.includes('2 times') && xml.includes('native German speaker') && xml.includes('Jesaja 61,3'));
   console.log('amazon kit ok');
+
+  // The author's own marketing kit: every part used exactly as written, only missing parts made
+  const mk = require('../src/marketing-kit');
+  const { makeEverything } = require('../src/quick');
+  const own = await mk.readKit([path.join(dir, 'kit', 'marketing-kit.txt')]);
+  assert.strictEqual(own.title, 'The River Remembers');
+  assert.strictEqual(own.series, 'The Delta Tales, Book Two');
+  assert.strictEqual(own.subtitle, 'A Delta Tale of Water and Memory'); // read from the cover prompt
+  assert.ok(own.description.startsWith('When the floods come early') && !/Word count/.test(own.description));
+  assert.ok(own.coverPrompt.includes('lanterns on the water'));
+  assert.strictEqual(own.keywords.length, 9);
+  assert.ok(!own.keywords.some((k) => /^mix of/i.test(k)));
+  assert.strictEqual(own.categories.length, 4);
+  assert.deepStrictEqual(mk.found(own).missing, []);
+  const packed = mk.packKeywords(own.keywords);
+  assert.strictEqual(packed.boxes.length, 7);
+  assert.ok(packed.boxes.every((b) => b.length <= 50));
+  for (const k of own.keywords) assert.ok(packed.extra.includes(k) || k.split(' ').every((w) => packed.boxes.some((b) => b.split(' ').includes(w))), k);
+  assert.ok(!/Inside this book/.test(mk.backBlurb(own.description)));
+  const kitOut = path.join(out, 'kit-book');
+  const made = await makeEverything(md.book, { languages: ['en', 'fr'], kit: own, folder: kitOut, aboutAuthor: {} },
+    { offline: async (texts) => texts }); // a stand-in translator that copies the words
+  const en = made.editions.find((e) => e.code === 'en');
+  assert.strictEqual(en.title, 'The River Remembers');
+  const listing = fs.readFileSync(path.join(en.dir, `${en.base} - Amazon listing.txt`), 'utf8');
+  assert.ok(listing.includes(own.description), 'the description word for word');
+  assert.ok(listing.includes('from your own marketing kit'));
+  for (const c of own.categories) assert.ok(listing.includes(c), c);
+  assert.ok(listing.includes('MORE CATEGORIES'));
+  assert.ok(!en.coverSpec.blurb.includes('Inside this book'));
+  assert.strictEqual(fs.readFileSync(path.join(kitOut, 'Cover prompt (from your marketing kit).txt'), 'utf8').trim(), own.coverPrompt);
+  assert.strictEqual(made.prompt, own.coverPrompt);
+  const fr = made.editions.find((e) => e.code === 'fr');
+  assert.ok(fr.words.amazonDesc.includes('When the floods come early') && fr.words.keys.length === 7);
+  const { coverHtml } = require('../src/cover');
+  const ready = coverHtml({ ...en.coverSpec, size: require('../src/cover').coverSize({ trim: '6x9', pages: 120 }), image: 'data:image/jpeg;base64,AA', frontReady: true });
+  assert.ok(!ready.includes('<h1>') && ready.includes('class="blurb"'));
+  console.log('marketing kit ok');
   console.log('All good.');
 })().catch((e) => { console.error(e); process.exit(1); });

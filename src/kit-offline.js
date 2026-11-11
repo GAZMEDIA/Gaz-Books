@@ -200,7 +200,7 @@ IMPORTANT: no words, no letters, no title, no logos, no watermark anywhere in th
 
 // ---------------------------------------------------------------- what goes in the zip
 
-function listingText({ lang, title, subtitle, author, desc, keys, categories, bio, pages, printMade }) {
+function listingText({ lang, title, subtitle, author, desc, keys, extraKeys = [], categories, bio, pages, printMade, fromKit = false }) {
   return [
     `AMAZON LISTING — ${lang.name.toUpperCase()}`,
     '(Copy each part into the matching box on kdp.amazon.com)',
@@ -213,11 +213,17 @@ function listingText({ lang, title, subtitle, author, desc, keys, categories, bi
     'DESCRIPTION',
     desc,
     '',
+    fromKit ? '(Description, keywords and categories are from your own marketing kit.)' : null,
+    fromKit ? '' : null,
     'KEYWORDS (one per box, 7 boxes)',
     ...keys.map((k, i) => `${i + 1}. ${k}`),
     '',
-    'CATEGORIES (pick up to 3)',
-    ...categories.map((c) => `• ${c}`),
+    ...(extraKeys.length ? ['EXTRA KEYWORDS (they did not fit in Amazon\'s 7 boxes: use them on Google Play and Kobo, or swap them in on Amazon later)',
+      ...extraKeys.map((k) => `• ${k}`), ''] : []),
+    ...(categories.length > 3 ? ['CATEGORIES (choose these 3 when you upload)', ...categories.slice(0, 3).map((c) => `• ${c}`), '',
+      'MORE CATEGORIES (after the book is live, ask Amazon to add them: KDP > Help > Contact Us > "Amazon Product Page" > "Update categories")',
+      ...categories.slice(3).map((c) => `• ${c}`)]
+      : ['CATEGORIES (pick up to 3)', ...categories.map((c) => `• ${c}`)]),
     '',
     printMade ? `PAPERBACK: ${pages} pages` : 'PAPERBACK: not made for this language (eBook and Word file only).',
     '',

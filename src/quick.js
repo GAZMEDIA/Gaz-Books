@@ -16,6 +16,7 @@ const { writeGooglePlay } = require('./googleplay');
 const ideas = require('./book-ideas');
 const coverDesign = require('./cover-design');
 const { suggestGenres } = require('./genres');
+const mk = require('./marketing-kit');
 
 // The first two or three sentences (about 55 words): the bio on the back cover.
 function shortBio(text) {
@@ -43,7 +44,9 @@ const LOOKS = { // built-in cover colours by kind of book (used until the author
 
 // opts: { languages: ['en', 'fr', ...], source: 'en', trim, title, subtitle, author,
 //         aboutAuthor: { text, photo, photoGrey }, aboutBook, folder,
-//         cover: { image, bg, ink, style } (optional picture for the covers) }
+//         cover: { image, bg, ink, style } (optional picture for the covers),
+//         kit: the author's own marketing kit (src/marketing-kit.js readKit): every
+//              part in it is used exactly as written; GazBook makes only the missing parts }
 // deps: { offline(texts, src, tgt, onPart) -> html[]  (the on-computer translator),
 //         renderCover(spec) -> { pdf, kindle } (optional; the app draws covers),
 //         need(feature) (licence checks) }
@@ -55,7 +58,11 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
   if (opts.title) book.title = opts.title;
   if (opts.subtitle !== undefined) book.subtitle = opts.subtitle;
   if (opts.author) book.author = opts.author;
-  const a = opts.aboutAuthor || {};
+  const mkit = opts.kit || null;
+  if (mkit && !opts.title && mkit.title) book.title = mkit.title;
+  if (mkit && opts.subtitle === undefined && mkit.subtitle) book.subtitle = mkit.subtitle;
+  let a = opts.aboutAuthor || {};
+  if (mkit && mkit.bio && !a.text) a = { ...a, text: mkit.bio };
   if (a.text || a.photo) {
     book.chapters = book.chapters.filter((c) => !ABOUT_AUTHOR_RE.test(c.title || ''));
     book.chapters.push(authorChapter(a));
@@ -63,18 +70,26 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
 
   // the marketing words, worked out once from the original
   const genre = kit.detectGenre(book);
+  // (from the author's marketing kit when they gave one: those parts exactly as written)
+  const fullDesc = mkit && mkit.description ? mkit.description : kit.description(book, opts.aboutBook, genre);
+  const packed = mkit && mkit.keywords.length ? mk.packKeywords(mkit.keywords) : { boxes: kit.keywords(book, genre), extra: [] };
   const words = {
-    desc: kit.description(book, opts.aboutBook, genre),
-    keys: kit.keywords(book, genre),
-    quote: opts.tagline || '', // empty unless the author gives one (a line from the book is offered as a suggestion)
+    desc: mkit && mkit.description ? mk.backBlurb(fullDesc) : fullDesc, // the back cover
+    amazonDesc: fullDesc, // the Amazon listing
+    keys: packed.boxes,
+    extraKeys: packed.extra,
+    quote: opts.tagline || (mkit && mkit.tagline) || '', // empty unless the author gives one (a line from the book is offered as a suggestion)
     bio: a.text || '',
     shortBio: shortBio(a.text),
   };
+  const categories = mkit && mkit.categories.length ? mkit.categories : kit.GENRES[genre].categories;
+  const kitKeys = mkit && mkit.keywords.length ? mkit.keywords : null;
   // the cover design request and the "words" request, both built from this book
   const g = kit.GENRES[genre];
   const designRequest = coverDesign.designRequest(book, { genre: g.name, mood: g.mood, look: g.look, images: ideas.findImages(book, 3),
     themes: ideas.themes(book, 5), trim: opts.trim || '6x9', cyrillic: langs.includes('uk') });
-  const prompt = designRequest;
+  // the author's own cover prompt, word for word, when the kit has one
+  const prompt = mkit && mkit.coverPrompt ? mkit.coverPrompt : designRequest;
   const intro = kit.descriptionDraft(book, '', genre).split('\n\n').find((p) => p.split(' ').length > 15) || '';
   const wordsPrompt = ideas.wordsPrompt(book, genre, kit.GENRES[genre], { introExcerpt: intro.split(/\s+/).slice(0, 60).join(' ') });
   const look = { ...LOOKS[genre], ...(opts.cover || {}) };
@@ -83,6 +98,7 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
   fs.mkdirSync(folder, { recursive: true });
   const promptFile = path.join(folder, 'Cover design request (paste into Gemini).txt');
   fs.writeFileSync(promptFile, `${designRequest}\n`);
+  if (mkit && mkit.coverPrompt) fs.writeFileSync(path.join(folder, 'Cover prompt (from your marketing kit).txt'), `${mkit.coverPrompt}\n`);
   fs.writeFileSync(path.join(folder, 'Back cover words request (paste into Gemini).txt'), `${wordsPrompt}\n`);
 
   // translations: started one after another, each queued whole on the translator
@@ -100,9 +116,12 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
     const job = chain.then(async () => {
       const name = (kdpLanguage(code) || {}).name || code;
       const b = await translateBook(book, tr(code), (p) => report(code, `Translating into ${name}`, p * 0.85));
-      const list = [words.desc, words.keys.join('\n'), words.quote, words.bio, words.shortBio];
-      const [desc, keys, quote, bio, sbio] = await translateStrings(list, tr(code));
-      return { book: b, words: { desc, keys: keys.split('\n').map((k) => k.trim()).filter(Boolean), quote, bio, shortBio: sbio } };
+      const allKeys = kitKeys || words.keys;
+      const list = [words.desc, words.amazonDesc, allKeys.join('\n'), words.quote, words.bio, words.shortBio];
+      const [desc, amazonDesc, keys, quote, bio, sbio] = await translateStrings(list, tr(code));
+      const tk = keys.split('\n').map((k) => k.trim()).filter(Boolean);
+      const p = kitKeys ? mk.packKeywords(tk) : { boxes: tk, extra: [] }; // the author's keywords, translated, packed into 7 boxes again
+      return { book: b, words: { desc, amazonDesc, keys: p.boxes, extraKeys: p.extra, quote, bio, shortBio: sbio } };
     });
     chain = job.catch(() => {});
     return job;
@@ -129,7 +148,7 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
       author: res.book.author || '', tagline: w.quote, blurb: w.desc.replace(/\n?Inside this book:[\s\S]*$/, '').trim() || w.desc,
       bio: w.shortBio, authorPhoto: a.photo || '', imageMode: 'front', ...look,
     };
-    save(`${base} - Amazon listing.txt`, kit.listingText({ lang, title: res.book.title, subtitle: res.book.subtitle, author: res.book.author, desc: w.desc, keys: w.keys, categories: kit.GENRES[genre].categories, bio: w.bio, pages: res.pageCount, printMade: pdfMade }));
+    save(`${base} - Amazon listing.txt`, kit.listingText({ lang, title: res.book.title, subtitle: res.book.subtitle, author: res.book.author, desc: w.amazonDesc, keys: w.keys, extraKeys: w.extraKeys, categories, bio: w.bio, pages: res.pageCount, printMade: pdfMade, fromKit: !!mkit }));
     save('How to upload to Amazon.txt', kit.uploadGuide({ lang, trim: opts.trim || '6x9', pages: res.pageCount, printMade: pdfMade, aiCover: !!(opts.cover && opts.cover.image) }));
     const ed = { code, name: lang.name, dir, base, pages: res.pageCount, printMade: pdfMade, coverSpec, files,
       title: res.book.title, subtitle: res.book.subtitle || '', author: res.book.author || '', words: w, book: b, lang };
@@ -139,7 +158,8 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
   }
   // the zip and the Google Play folder are made by finish(), after "Check before printing"
   return { folder, zipPath: path.join(folder, `${safeName(book.title)}.zip`), editions, genre, isbns: opts.isbns || {}, prompt, designRequest, wordsPrompt, promptFile, notes, genres: suggestGenres(book, genre),
-    trim: opts.trim || '6x9', source, aboutAuthor: a, suggestion: kit.pullQuote(book), seconds: (Date.now() - t0) / 1000 };
+    trim: opts.trim || '6x9', source, aboutAuthor: a, suggestion: kit.pullQuote(book), seconds: (Date.now() - t0) / 1000,
+    categories, fromKit: !!mkit, kitFound: mkit ? mk.found(mkit) : null };
 }
 
 // The last stage: every language ready for Google Play too, and everything in one zip.
@@ -189,6 +209,7 @@ async function updateBack(res, vals, deps, onProgress = () => {}) {
     const own = ed.code === res.source;
     const [desc, quote, bio, sbio] = own || !list.some(Boolean) ? list : await translateStrings(list, tr);
     Object.assign(ed.words, { desc, quote, bio, shortBio: sbio });
+    if (!res.fromKit) ed.words.amazonDesc = desc; // a kit's Amazon description stays exactly as the author wrote it
     // the cover words: the author's name is the same everywhere; title and subtitle are translated
     if (own) Object.assign(ed, { title, subtitle });
     else if (namesChanged) {
@@ -224,7 +245,7 @@ async function updateBack(res, vals, deps, onProgress = () => {}) {
       ed.files = ed.files.filter((f) => f !== old);
       ed.pages = built.pageCount;
     }
-    fs.writeFileSync(path.join(ed.dir, `${ed.base} - Amazon listing.txt`), kit.listingText({ lang: ed.lang, title: ed.title, subtitle: ed.subtitle, author: ed.author, desc, keys: ed.words.keys, categories: kit.GENRES[res.genre].categories, bio, pages: ed.pages, printMade: ed.printMade }));
+    fs.writeFileSync(path.join(ed.dir, `${ed.base} - Amazon listing.txt`), kit.listingText({ lang: ed.lang, title: ed.title, subtitle: ed.subtitle, author: ed.author, desc: ed.words.amazonDesc || desc, keys: ed.words.keys, extraKeys: ed.words.extraKeys || [], categories: res.categories || kit.GENRES[res.genre].categories, bio, pages: ed.pages, printMade: ed.printMade, fromKit: !!res.fromKit }));
     Object.assign(ed.coverSpec, { title: ed.title, subtitle: ed.subtitle, author, tagline: quote, blurb: blurbOf(desc), bio: sbio, authorPhoto: vals.photo || '', pages: ed.pages });
     if (deps.renderCover) await drawCovers(ed, deps.renderCover);
   }
