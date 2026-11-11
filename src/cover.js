@@ -15,6 +15,10 @@ const PAPER = {
 };
 const SPINE_TEXT_MIN_PAGES = 79; // KDP: spine text only for books over 79 pages
 const BARCODE = { w: 2, h: 1.2 };
+// KDP rejects spine text closer than 0.375 in to the top or bottom edge. Keep
+// it 0.375 in inside the trim plus a little extra, so printers never cut it.
+const SPINE_EDGE = 0.375;
+const SPINE_SAFE = BLEED + SPINE_EDGE + 0.05; // from the page edge (bleed included)
 
 function coverSize({ trim = '6x9', pages = 200, paper = 'white' }) {
   const [tw, th] = TRIM_SIZES[trim] || TRIM_SIZES['6x9'];
@@ -97,6 +101,7 @@ function coverHtml(spec) {
   const guides = spec.guides ? `
 <div class="g" style="left:${BLEED}in;top:${BLEED}in;right:${BLEED}in;bottom:${BLEED}in;border:1px dashed #f0f"></div>
 <div class="g" style="left:${s.spineBox.x}in;width:${s.spine}in;top:0;bottom:0;border-left:1px dashed #0ff;border-right:1px dashed #0ff"></div>
+<div class="g" style="left:${s.spineBox.x}in;width:${s.spine}in;top:${SPINE_SAFE}in;bottom:${SPINE_SAFE}in;border:1px dotted #ff0"></div>
 <div class="g" style="left:${safe}in;top:${safe}in;width:${s.trimW - 0.5}in;bottom:${safe}in;border:1px dotted #ff0"></div>
 <div class="g" style="left:${s.front.x + 0.25}in;top:${safe}in;width:${s.trimW - 0.5}in;bottom:${safe}in;border:1px dotted #ff0"></div>` : '';
 
@@ -116,7 +121,7 @@ body{position:relative;background:${bg};color:${ink};font-family:${st.body},seri
 .front h1{font-family:${st.title},serif;font-weight:normal;font-size:${Math.min(0.62, s.trimW * 0.105)}in;line-height:1.05;text-transform:${st.titleCase};letter-spacing:${st.spacing};text-shadow:0 0.02in 0.08in rgba(0,0,0,.5)}
 .front h2{font-style:italic;font-weight:normal;font-size:${Math.min(0.24, s.trimW * 0.042)}in;margin-top:0.18in;text-shadow:0 0.01in 0.05in rgba(0,0,0,.6)}
 .front .a{position:absolute;left:0.4in;right:${BLEED + 0.4}in;bottom:${BLEED + 0.6}in;text-align:center;font-family:${st.title},serif;font-size:${Math.min(0.3, s.trimW * 0.05)}in;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 0.01in 0.05in rgba(0,0,0,.6)}
-.spine{display:flex;align-items:center;justify-content:center;overflow:hidden}
+.spine .in{position:absolute;left:0;right:0;top:${SPINE_SAFE}in;bottom:${SPINE_SAFE}in;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .spine .w{writing-mode:vertical-rl;white-space:nowrap;font-family:${st.title},serif;font-size:${Math.max(0.08, Math.min(0.3, (s.spine - 0.125) * 0.62))}in;letter-spacing:.08em;text-transform:uppercase}
 .spine .sep{display:inline-block;height:0.35in}
 .back .box{position:absolute;left:${safe}in;right:${0.25}in;top:${safe}in;max-height:${(s.height - safe - (BLEED + 0.25 + BARCODE.h + 0.2)).toFixed(3)}in;overflow:hidden;background:${wrap && img ? 'rgba(0,0,0,.42)' : 'transparent'};padding:0.28in 0.3in;border-radius:0.04in}
@@ -136,7 +141,7 @@ ${img && !wrap ? `<div class="art" style="left:${s.front.x}in;width:${s.front.w}
   <div class="box">${spec.tagline ? `<div class="tag">${esc(spec.tagline)}</div>` : ''}<div class="blurb">${paras(spec.blurb)}</div>${spec.bio || spec.authorPhoto ? `<div class="bio">${spec.authorPhoto ? `<img class="ap" src="${spec.authorPhoto}" alt="">` : ''}${paras(spec.bio)}</div>` : ''}</div>
   <div class="barcode">${spec.guides ? 'Barcode area (KDP adds it)' : ''}</div>
 </div>
-<div class="panel spine" style="left:${s.spineBox.x}in;width:${s.spine}in">${spineWords ? `<div class="w">${spineWords}</div>` : ''}</div>
+<div class="panel spine" style="left:${s.spineBox.x}in;width:${s.spine}in">${spineWords ? `<div class="in"><div class="w">${spineWords}</div></div>` : ''}</div>
 <div class="panel front" style="left:${s.front.x}in;width:${s.front.w}in">
 ${spec.frontReady && img ? '' : D ? designedFront(spec, D) : `  ${img ? '<div class="shade"></div>' : ''}
   <div class="t"><h1>${esc(spec.title)}</h1>${spec.subtitle ? `<h2>${esc(spec.subtitle)}</h2>` : ''}</div>
@@ -171,7 +176,8 @@ ${guides}
       shrink(lay, 'h1, h2', function () { return lay.scrollHeight <= lay.clientHeight + 1; }, 10);
     }
     var sp = document.querySelector('.spine .w');
-    shrink(sp, '', function () { return sp.scrollHeight <= sp.parentNode.clientHeight - 20; }, 6);
+    // the spine words must stay inside the safe box (0.375 in from top and bottom)
+    shrink(sp, '', function () { return sp.scrollHeight <= sp.parentNode.clientHeight; }, 4);
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit); else window.addEventListener('load', fit);
 })();
@@ -206,4 +212,4 @@ function imagePrompts({ title, genre, mood, setting, details, size }) {
   };
 }
 
-module.exports = { coverSize, coverHtml, imagePrompts, printEstimate, PAPER, BLEED, BARCODE, SPINE_TEXT_MIN_PAGES };
+module.exports = { coverSize, coverHtml, imagePrompts, printEstimate, PAPER, BLEED, BARCODE, SPINE_TEXT_MIN_PAGES, SPINE_EDGE, SPINE_SAFE };
