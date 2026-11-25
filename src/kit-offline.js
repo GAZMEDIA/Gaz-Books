@@ -213,7 +213,7 @@ function listingText({ lang, title, subtitle, author, desc, keys, extraKeys = []
     'DESCRIPTION',
     desc,
     '',
-    fromKit ? '(Description, keywords and categories are from your own marketing kit.)' : null,
+    fromKit ? '(Description, keywords and categories are from your own marketing kit, exactly as written. Your kit file itself is in this folder too.)' : null,
     fromKit ? '' : null,
     'KEYWORDS (one per box, 7 boxes)',
     ...keys.map((k, i) => `${i + 1}. ${k}`),

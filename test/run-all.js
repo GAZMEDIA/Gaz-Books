@@ -128,6 +128,21 @@ require('./mksample');
   assert.strictEqual(made.prompt, own.coverPrompt);
   const fr = made.editions.find((e) => e.code === 'fr');
   assert.ok(fr.words.amazonDesc.includes('When the floods come early') && fr.words.keys.length === 7);
+  // keywords exactly as written, one per box, in order; the rest listed as extra, none merged
+  assert.deepStrictEqual([...en.words.keys, ...en.words.extraKeys], own.keywords);
+  // the kit file itself comes back: unchanged in the original language, translated line by line in others
+  const kitSrc = fs.readFileSync(path.join(dir, 'kit', 'marketing-kit.txt'), 'utf8');
+  assert.strictEqual(fs.readFileSync(path.join(en.dir, 'Marketing kit - marketing-kit.txt'), 'utf8'), kitSrc);
+  const frKit = path.join(fr.dir, `Marketing kit (${fr.name}) - marketing-kit.txt`);
+  assert.ok(fs.existsSync(frKit) && fr.files.includes(frKit));
+  assert.strictEqual(fs.readFileSync(frKit, 'utf8').split('\n').length, kitSrc.replace(/\r/g, '').split('\n').length);
+  // a Word kit keeps its paragraphs and styles; only the words change (and list marks stay)
+  const JSZipT = require('jszip');
+  const dz = new JSZipT();
+  dz.file('word/document.xml', '<w:document><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Book </w:t></w:r><w:r><w:t>Description</w:t></w:r></w:p><w:p><w:r><w:t>• river &amp; rain</w:t></w:r></w:p><w:p/></w:body></w:document>');
+  const shout = async (list) => list.map((x) => x.toUpperCase());
+  const dx = await (await JSZipT.loadAsync(await mk.translateDocx(await dz.generateAsync({ type: 'nodebuffer' }), shout))).file('word/document.xml').async('string');
+  assert.ok(dx.includes('<w:pStyle w:val="Heading1"/>') && dx.includes('<w:b/>') && dx.includes('>BOOK DESCRIPTION<') && dx.includes('>• RIVER &amp; RAIN<') && dx.includes('<w:p/>'), dx);
   const { coverHtml } = require('../src/cover');
   const ready = coverHtml({ ...en.coverSpec, size: require('../src/cover').coverSize({ trim: '6x9', pages: 120 }), image: 'data:image/jpeg;base64,AA', frontReady: true });
   assert.ok(!ready.includes('<h1>') && ready.includes('class="blurb"'));

@@ -118,7 +118,9 @@ async function readKit(files) {
     k.file = path.basename(f);
     kits.push(k);
   }
-  return mergeKits(kits);
+  const kit = mergeKits(kits);
+  kit.paths = files.slice(); // the files themselves, to give back exactly as they came
+  return kit;
 }
 
 // What GazBook found, in plain words, for the screen.
@@ -180,4 +182,103 @@ function backBlurb(desc, maxWords = 170) {
   return out.join('\n\n') || paras[0] || '';
 }
 
-module.exports = { kitText, parseKit, mergeKits, readKit, found, packKeywords, backBlurb, titleCase };
+// ---------------------------------------------------------------- the kit itself, in every language
+
+// A list mark ("•", "1.", "a)", "#") stays as it is; only the words after it are translated.
+const MARK = /^(\s*(?:[-*•·▪◦–—]|\(?\d{1,3}[.)]|[a-z][.)]|#{1,6})\s+)/i;
+const splitMark = (line) => { const m = String(line).match(MARK); return m ? [m[1], line.slice(m[1].length)] : ['', line]; };
+
+// translate(strings) -> strings, one result per string, same order
+async function translateLines(lines, translate) {
+  const parts = lines.map(splitMark);
+  const todo = [];
+  parts.forEach(([, words], i) => { if (words.trim()) todo.push(i); });
+  const got = todo.length ? await translate(todo.map((i) => parts[i][1])) : [];
+  const out = parts.map(([mark, words]) => mark + words);
+  todo.forEach((i, n) => { out[i] = parts[i][0] + (String(got[n] || '').replace(/\n+/g, ' ').trim() || parts[i][1]); });
+  return out;
+}
+
+const xmlText = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// A Word kit, translated in place: every paragraph keeps its own style, list,
+// heading, bold and layout; only the words change.
+async function translateDocx(buffer, translate) {
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(buffer);
+  const T = /<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>|<w:t\s*\/>/g;
+  for (const name of Object.keys(zip.files).filter((n) => /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/.test(n))) {
+    const xml = await zip.file(name).async('string');
+    const paras = [];
+    xml.replace(/<w:p[\s>][\s\S]*?<\/w:p>/g, (p, at) => { paras.push({ p, at }); return p; });
+    const texts = paras.map(({ p }) => { let t = ''; p.replace(T, (_m, x) => { t += xmlText(x || ''); return _m; }); return t; });
+    const done = await translateLines(texts, translate);
+    let out = '';
+    let last = 0;
+    paras.forEach(({ p, at }, i) => {
+      out += xml.slice(last, at);
+      last = at + p.length;
+      if (!texts[i].trim() || done[i] === texts[i]) { out += p; return; }
+      let first = true;
+      out += p.replace(T, () => {
+        if (!first) return '<w:t xml:space="preserve"></w:t>';
+        first = false;
+        return `<w:t xml:space="preserve">${xmlEsc(done[i])}</w:t>`;
+      });
+    });
+    zip.file(name, out + xml.slice(last));
+  }
+  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
+// A PDF kit, translated: the same lines in the same order, as a plain PDF.
+function linesPdf(lines) {
+  const PDFDocument = require('pdfkit');
+  const fonts = path.join(__dirname, '..', 'fonts');
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 56 });
+    const bufs = [];
+    doc.on('data', (b) => bufs.push(b)); doc.on('end', () => resolve(Buffer.concat(bufs))); doc.on('error', reject);
+    doc.registerFont('R', path.join(fonts, 'NotoSerif-Regular.ttf'));
+    doc.font('R').fontSize(11);
+    for (const l of lines) doc.text(l || ' ', { lineGap: 2 });
+    doc.end();
+  });
+}
+
+// The author's kit files for one language: the original language gets the
+// files back exactly as they came; any other language gets the same files
+// with every line translated, in the same order, the same layout and the same
+// file type. Nothing is cut, merged or reworded.
+// translate: async (strings) -> strings (omit for the original language)
+async function writeKitFiles(kit, dir, { language, translate, plainOnly = false } = {}) {
+  const fs = require('fs');
+  const made = [];
+  for (const f of (kit && kit.paths) || []) {
+    if (!fs.existsSync(f)) continue;
+    const ext = path.extname(f).toLowerCase();
+    const stem = path.basename(f, path.extname(f));
+    if (!translate) {
+      const to = path.join(dir, `Marketing kit - ${path.basename(f)}`);
+      fs.copyFileSync(f, to);
+      made.push(to);
+      continue;
+    }
+    const name = (e) => path.join(dir, `Marketing kit (${language}) - ${stem}${e}`);
+    const buf = fs.readFileSync(f);
+    if (ext === '.docx') {
+      const to = name('.docx');
+      fs.writeFileSync(to, await translateDocx(buf, translate));
+      made.push(to);
+      continue;
+    }
+    const lines = await translateLines((await kitText(buf, f)).replace(/\r/g, '').split('\n'), translate);
+    const to = ext === '.pdf' && !plainOnly ? name('.pdf') : name(ext === '.pdf' ? '.txt' : ext);
+    fs.writeFileSync(to, to.endsWith('.pdf') ? await linesPdf(lines) : lines.join('\n'));
+    made.push(to);
+  }
+  return made;
+}
+
+module.exports = { writeKitFiles, translateLines, translateDocx, kitText, parseKit, mergeKits, readKit, found, packKeywords, backBlurb, titleCase };

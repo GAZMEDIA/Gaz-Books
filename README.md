@@ -30,12 +30,15 @@ categories, about the author) in Word, PDF or text, in one file or several?
 Put it in at step 1 ("Your marketing kit"). GazBook finds each part by its
 heading and uses it **exactly as written**: the description goes on Amazon word
 for word (its opening paragraphs, up to about 170 words, go on the back
-cover), the keywords are packed into Amazon's 7 boxes of 50 characters (the
-rest are listed as extra keywords for Google Play and Kobo), the first 3
+cover), the keywords stay exactly as written, one per box in their order (any
+after the 7th are listed as extra keywords for Google Play and Kobo), the first 3
 categories are for upload and the rest are listed to ask Amazon to add, and
 the cover prompt is saved as is and offered with a Copy button. Only the
-parts the kit does not have are made by GazBook. For other languages the
-kit's description and keywords are translated. At step 3, "Already have a
+parts the kit does not have are made by GazBook. The kit files themselves come
+back in every language folder: unchanged in the book's own language, and
+translated line by line in the other languages, with the same headings, lists,
+order and file type (a Word kit keeps its styles and bold; a PDF kit comes back
+as a PDF). Nothing in the kit is cut, merged or reworded. At step 3, "Already have a
 finished front cover?" puts a cover that already shows the title and name on
 the front unchanged, with a matching spine and back (original language only).
 
