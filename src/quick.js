@@ -72,7 +72,9 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
   const genre = kit.detectGenre(book);
   // (from the author's marketing kit when they gave one: those parts exactly as written)
   const fullDesc = mkit && mkit.description ? mkit.description : kit.description(book, opts.aboutBook, genre);
-  const packed = mkit && mkit.keywords.length ? mk.packKeywords(mkit.keywords) : { boxes: kit.keywords(book, genre), extra: [] };
+  // the author's keywords exactly as written, one per box, in their order (none merged or changed)
+  const asGiven = (keys) => ({ boxes: keys.slice(0, 7), extra: keys.slice(7) });
+  const packed = mkit && mkit.keywords.length ? asGiven(mkit.keywords) : { boxes: kit.keywords(book, genre), extra: [] };
   const words = {
     desc: mkit && mkit.description ? mk.backBlurb(fullDesc) : fullDesc, // the back cover
     amazonDesc: fullDesc, // the Amazon listing
@@ -120,7 +122,7 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
       const list = [words.desc, words.amazonDesc, allKeys.join('\n'), words.quote, words.bio, words.shortBio];
       const [desc, amazonDesc, keys, quote, bio, sbio] = await translateStrings(list, tr(code));
       const tk = keys.split('\n').map((k) => k.trim()).filter(Boolean);
-      const p = kitKeys ? mk.packKeywords(tk) : { boxes: tk, extra: [] }; // the author's keywords, translated, packed into 7 boxes again
+      const p = kitKeys ? asGiven(tk) : { boxes: tk, extra: [] }; // the author's keywords, translated one by one, same order
       return { book: b, words: { desc, amazonDesc, keys: p.boxes, extraKeys: p.extra, quote, bio, shortBio: sbio } };
     });
     chain = job.catch(() => {});
@@ -149,6 +151,11 @@ async function makeEverything(book0, opts, deps, onProgress = () => {}) {
       bio: w.shortBio, authorPhoto: a.photo || '', imageMode: 'front', ...look,
     };
     save(`${base} - Amazon listing.txt`, kit.listingText({ lang, title: res.book.title, subtitle: res.book.subtitle, author: res.book.author, desc: w.amazonDesc, keys: w.keys, extraKeys: w.extraKeys, categories, bio: w.bio, pages: res.pageCount, printMade: pdfMade, fromKit: !!mkit }));
+    // the author's own marketing kit, as it came (translated line by line for other languages)
+    if (mkit) {
+      const translate = code === source ? null : (list) => translateStrings(list, tr(code));
+      files.push(...await mk.writeKitFiles(mkit, dir, { language: lang.name, translate, plainOnly: !lang.print }));
+    }
     save('How to upload to Amazon.txt', kit.uploadGuide({ lang, trim: opts.trim || '6x9', pages: res.pageCount, printMade: pdfMade, aiCover: !!(opts.cover && opts.cover.image) }));
     const ed = { code, name: lang.name, dir, base, pages: res.pageCount, printMade: pdfMade, coverSpec, files,
       title: res.book.title, subtitle: res.book.subtitle || '', author: res.book.author || '', words: w, book: b, lang };

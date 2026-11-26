@@ -67,18 +67,29 @@ function gotKit(k) {
   $('kitDrop').classList.toggle('hidden', !!kit);
   $('aboutBookBox').classList.toggle('hidden', !!(kit && kit.description));
   if (!kit) return;
-  $('kitHas').textContent = `✓ GazBook will use, exactly as you wrote them: ${kit.has.join(', ')}.`;
-  $('kitMissing').textContent = kit.missing.length ? `GazBook will make the rest for you: ${kit.missing.join(', ')}.` : 'Your kit is complete. GazBook will not change any of it.';
+  $('kitHas').textContent = kit.has.length ? `✓ GazBook will use, exactly as you wrote them: ${kit.has.join(', ')}.`
+    : '✓ Your kit is in. GazBook will give your file(s) back exactly as they are, and translated the same way for other languages.';
+  $('kitMissing').textContent = !kit.has.length ? 'GazBook did not find headings such as "Description", "Keywords" or "Categories" in it, so it will also make its own listing for Amazon.'
+    : kit.missing.length ? `GazBook will make the rest for you: ${kit.missing.join(', ')}.` : 'Your kit is complete. GazBook will not change any of it.';
   $('kitFiles').textContent = `From: ${kit.files.join(', ')}`;
   // fill empty boxes from the kit (the author can still change them)
   if (kit.title && (!$('title').value.trim() || (book && $('title').value === (book.title || '')))) { $('title').value = kit.title; $('title').oninput(); }
   if (kit.subtitle && !$('subtitle').value.trim()) { $('subtitle').value = kit.subtitle; $('subtitle').oninput(); }
   if (kit.bio && !$('aboutAuthor').value.trim()) $('aboutAuthor').value = kit.bio;
 }
-dropZone($('kitDrop'), () => {}, () => run(() => q.pickKit()).then((k) => k && gotKit(k)));
-$('kitDrop').ondrop = (e) => { e.preventDefault(); $('kitDrop').classList.remove('over'); if (e.dataTransfer.files.length) run(() => q.dropKit(e.dataTransfer.files)).then((k) => k && gotKit(k)); };
-$('kitAdd').onclick = () => run(() => q.pickKit()).then((k) => k && gotKit(k));
-$('kitClear').onclick = () => run(() => q.clearKit()).then(() => gotKit(null));
+// a problem with the kit is shown right in the kit box, where the author is looking
+async function runKit(fn) {
+  showError(''); $('kitError').classList.add('hidden');
+  try { const k = await fn(); if (k) gotKit(k); return k; } catch (e) {
+    $('kitError').textContent = clean(e.message); $('kitError').classList.remove('hidden');
+    $('kitError').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return null;
+  }
+}
+dropZone($('kitDrop'), () => {}, () => runKit(() => q.pickKit()));
+$('kitDrop').ondrop = (e) => { e.preventDefault(); $('kitDrop').classList.remove('over'); if (e.dataTransfer.files.length) runKit(() => q.dropKit(e.dataTransfer.files)); };
+$('kitAdd').onclick = () => runKit(() => q.pickKit());
+$('kitClear').onclick = () => runKit(() => q.clearKit()).then(() => gotKit(null));
 $('title').oninput = () => { $('fTitle').textContent = $('title').value; };
 $('author').oninput = () => { $('fBy').textContent = $('author').value ? `, by ${$('author').value}` : ''; };
 $('subtitle').oninput = () => { $('fSub').textContent = $('subtitle').value ? `Subtitle: ${$('subtitle').value}` : ''; };
