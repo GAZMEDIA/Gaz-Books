@@ -6,7 +6,7 @@ const fs = require('fs');
 const [file, out] = process.argv.slice(-2);
 fs.mkdirSync(out, { recursive: true });
 app.setPath('userData', path.join(out, 'userdata'));
-try { require('./signed-in'); } catch (e) { /* builds without the Gaz account */ }
+require('./signed-in')(path.join(out, 'userdata'));
 dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
 require('../app/main.js');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
