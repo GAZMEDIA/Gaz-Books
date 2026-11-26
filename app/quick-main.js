@@ -48,20 +48,26 @@ module.exports = function quickMain({ getWin, loadSettings, saveSettings, need, 
   // One file or several; each new file adds to the kit (a part comes from the first file that has it).
   async function addKit(files) {
     const ok = files.filter((f) => /\.(docx|pdf|txt|md)$/i.test(f));
+    const old = files.filter((f) => /\.(doc|rtf|odt)$/i.test(f));
+    if (!ok.length && old.length) throw new Error(`${path.basename(old[0])} is an older Word file. Open it in Word, choose File > Save As > "Word Document (*.docx)", then put the new .docx file here.`);
     if (!ok.length) throw new Error('GazBook reads marketing kits saved as Word (.docx), PDF or text files.');
     kitFiles = [...new Set([...kitFiles, ...ok])];
     return kitNow();
   }
   async function kitNow() {
     if (!kitFiles.length) return null;
-    const k = await marketingKit.readKit(kitFiles);
+    let k;
+    try { k = await marketingKit.readKit(kitFiles); } catch (e) {
+      kitFiles = kitFiles.filter((f) => f !== e.file);
+      throw new Error(`GazBook could not open ${e.file ? path.basename(e.file) : 'that file'}: ${e.message}`);
+    }
+    // a kit without the usual headings is still taken: its files come back exactly as they are
     const f = marketingKit.found(k);
-    if (!f.has.length) throw new Error('GazBook could not find a description, cover prompt, keywords or categories in that file. Check it has headings such as "Description", "Keywords" and "Categories".');
     return { ...f, title: k.title, subtitle: k.subtitle, series: k.series, bio: k.bio, tagline: k.tagline, files: k.files,
       coverPrompt: k.coverPrompt, keywords: k.keywords, categories: k.categories, description: k.description };
   }
   ipcMain.handle('quick-pick-kit', async () => {
-    const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your marketing kit (you can pick several files)', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Marketing kit', extensions: ['docx', 'pdf', 'txt', 'md'] }] });
+    const r = await dialog.showOpenDialog(getWin(), { title: 'Choose your marketing kit (you can pick several files)', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Marketing kit', extensions: ['docx', 'doc', 'pdf', 'txt', 'md'] }] });
     return r.canceled || !r.filePaths.length ? null : addKit(r.filePaths);
   });
   ipcMain.handle('quick-drop-kit', (_e, files) => addKit(files));

@@ -9,8 +9,16 @@ const path = require('path');
 async function kitText(buffer, file) {
   const ext = path.extname(file).toLowerCase();
   if (ext === '.docx') {
-    const mammoth = require('mammoth');
-    return (await mammoth.extractRawText({ buffer })).value;
+    try {
+      const mammoth = require('mammoth');
+      return (await mammoth.extractRawText({ buffer })).value;
+    } catch (e) { // some Word files trip the reader: take the words straight from the document
+      const JSZip = require('jszip');
+      const zip = await JSZip.loadAsync(buffer);
+      const xml = await zip.file('word/document.xml').async('string');
+      return (xml.match(/<w:p[\s>][\s\S]*?<\/w:p>/g) || []).map((p) => (p.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || [])
+        .map((t) => t.replace(/<[^>]+>/g, '')).join('').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')).join('\n');
+    }
   }
   if (ext === '.pdf') {
     const { pdfToHtml } = require('./read-pdf');
@@ -114,7 +122,9 @@ async function readKit(files) {
   const fs = require('fs');
   const kits = [];
   for (const f of files) {
-    const k = parseKit(await kitText(fs.readFileSync(f), f));
+    let text;
+    try { text = await kitText(fs.readFileSync(f), f); } catch (e) { e.file = f; throw e; }
+    const k = parseKit(text);
     k.file = path.basename(f);
     kits.push(k);
   }
