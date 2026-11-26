@@ -6,6 +6,7 @@ const fs = require('fs');
 const args = process.argv.slice(2).filter((a) => !a.startsWith('-') && !a.endsWith('selftest-translate.js'));
 const [book, out, engine = 'gfree', lang = 'yo'] = args;
 dialog.showOpenDialog = async (w, o) => ({ canceled: false, filePaths: [o.properties.includes('openDirectory') ? out : book] });
+require('./signed-in')(require('electron').app.getPath('userData')); // past the Gaz account screen
 require('../app/main.js');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 app.on('browser-window-created', (_e, win) => {

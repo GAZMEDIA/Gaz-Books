@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+<title>GazBook: sign in</title>
+<link rel="stylesheet" href="quick.css">
+<style>
+  .acc { max-width: 460px; margin: 40px auto; padding: 0 20px 60px; }
+  .acc .card { padding: 26px 26px 18px; }
+  .acc h1 { font-size: 26px; text-align: center; margin-bottom: 6px; }
+  .acc .lead { text-align: center; color: var(--muted); margin: 0 0 18px; }
+  .acc .big-logo { display: block; width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 12px; }
+  .acc .msg { padding: 10px 12px; border-radius: 10px; margin: 0 0 14px; font-size: 14px; }
+  .acc .msg.err { background: #fbe9e7; color: var(--err); border: 1px solid #f1c6c0; }
+  .acc .msg.ok { background: #e9f3ec; color: var(--ok); border: 1px solid #cfe5d6; }
+  .acc .links { text-align: center; font-size: 14px; color: var(--muted); margin-top: 14px; }
+  .acc .links button { font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="acc">
+  <img class="big-logo" src="../icon.png" alt="">
+  <h1 id="title">Create your Gaz account</h1>
+  <p class="lead" id="lead">GazBook needs a free Gaz Media account. The same account works for every Gaz app.</p>
+  <div class="card">
+    <p class="msg hidden" id="msg" role="alert"></p>
+    <form id="form" novalidate>
+      <label data-for="register">Your name<input id="name" autocomplete="name"></label>
+      <label>Email<input id="email" type="email" autocomplete="email"></label>
+      <label data-for="register">Phone (WhatsApp)<input id="phone" type="tel" autocomplete="tel"></label>
+      <label data-for="register">Publisher or pen name <span class="opt">(optional)</span><input id="church" autocomplete="organization"></label>
+      <label data-for="reset">6-digit code from the email<input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"></label>
+      <label data-for="register login reset"><span id="passLabel">Choose a password (at least 8 characters)</span><input id="password" type="password"></label>
+      <button class="primary huge" id="go">Create account</button>
+    </form>
+    <div class="links" id="links"></div>
+  </div>
+  <p class="hint" style="text-align:center">You need the internet to sign in. After that, GazBook works offline.</p>
+</div>
+<script src="account.js"></script>
+</body>
+</html>

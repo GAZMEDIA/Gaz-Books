@@ -38,6 +38,8 @@ globalThis.fetch = async (url, o = {}) => {
   return reply({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(ans) }] } }] });
 };
 
+require('./signed-in')(require('electron').app.getPath('userData')); // past the Gaz account screen
+
 require('../app/main.js');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let first = true;

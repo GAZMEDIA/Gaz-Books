@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const [book, out] = process.argv.slice(-2);
 dialog.showOpenDialog = async (w, o) => ({ canceled: false, filePaths: [o.properties.includes('openDirectory') ? out : book] });
+require('./signed-in')(require('electron').app.getPath('userData')); // past the Gaz account screen
 require('../app/main.js');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 app.on('browser-window-created', (_e, win) => {

@@ -9,15 +9,18 @@ const { googleLanguages, googleFreeLanguages, translateStrings } = require('../s
 const { offlineTranslate, offlineLanguages } = require('./offline-main');
 const { TRIM_SIZES } = require('../src/kdp');
 const license = require('../src/license');
+const { AccountClient, checkAccountForm } = require('../src/account');
 
 let win;
 let current = null; // { book, file }
 
+// kept encrypted on disk (the account token too)
+const SECRET_KEYS = ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey', 'accountToken'];
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 function loadSettings() {
   try {
     const s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
-    for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) {
+    for (const k of SECRET_KEYS) {
       if (s[k] && s[`${k}Enc`] && safeStorage.isEncryptionAvailable()) s[k] = safeStorage.decryptString(Buffer.from(s[k], 'base64'));
       delete s[`${k}Enc`];
     }
@@ -26,7 +29,7 @@ function loadSettings() {
 }
 function saveSettings(s) {
   const out = { ...s };
-  for (const k of ['googleKey', 'claudeKey', 'geminiKey', 'pexelsKey']) {
+  for (const k of SECRET_KEYS) {
     if (out[k] && safeStorage.isEncryptionAvailable()) { out[k] = safeStorage.encryptString(out[k]).toString('base64'); out[`${k}Enc`] = true; }
   }
   fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
@@ -47,9 +50,64 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   win.setMenuBarVisibility(false);
-  // the one-click screens; "More tools" in there opens the full studio (index.html)
+  // everyone signs in with a Gaz account first; then the one-click screens
+  // ("More tools" in there opens the full studio, index.html)
+  if (!signedIn()) return showAccount();
   win.loadFile(path.join(__dirname, 'ui', 'quick.html'));
+  checkAccount();
 }
+
+// ---------- the Gaz account (src/account.js) ----------
+
+const account = new AccountClient({
+  machine: () => {
+    const s = loadSettings();
+    if (!s.machine) { s.machine = require('crypto').randomBytes(12).toString('hex'); saveSettings(s); }
+    return s.machine;
+  },
+});
+let accountNote = '';
+const signedIn = () => !!loadSettings().accountToken;
+function showAccount(note = '') {
+  accountNote = note;
+  win.loadFile(path.join(__dirname, 'ui', 'account.html'));
+}
+function signOut(note = '') {
+  const s = loadSettings();
+  delete s.accountToken;
+  saveSettings(s);
+  showAccount(note);
+}
+// Is the account still signed in? (a new password on the website signs every
+// computer out). Without internet the app carries on.
+async function checkAccount() {
+  const r = await account.call('check', { token: loadSettings().accountToken });
+  if (r.signedOut) signOut('Please sign in again.');
+  else if (r.ok && r.account) saveSettings({ ...loadSettings(), accountEmail: r.account.email, accountName: r.account.name });
+}
+
+ipcMain.handle('account-info', () => {
+  const s = loadSettings();
+  const note = accountNote;
+  accountNote = '';
+  return { email: s.accountEmail || s.email || '', known: !!s.accountEmail, note, signedIn: !!s.accountToken, name: s.accountName || '' };
+});
+ipcMain.handle('account-call', async (_e, action, d = {}) => {
+  if (!['register', 'login', 'forgot', 'reset'].includes(action)) return { error: 'Unknown action' };
+  const problem = action === 'forgot' ? checkAccountForm('login', { ...d, password: 'x' }) : checkAccountForm(action, d);
+  if (problem) return { error: problem };
+  const email = String(d.email || '').trim().toLowerCase();
+  const r = await account.call(action, { name: d.name, email, phone: d.phone, church: d.church, code: d.code, password: d.password });
+  if (r.error) return { error: r.error };
+  if (action === 'forgot') return { ok: true, message: r.message };
+  const a = r.account || {};
+  const s = loadSettings();
+  // the plan code goes with the same email, unless one is in already
+  saveSettings({ ...s, accountToken: r.token, accountEmail: a.email || email, accountName: a.name || d.name || '', email: s.code ? s.email : (a.email || email) });
+  win.loadFile(path.join(__dirname, 'ui', 'quick.html'));
+  return { ok: true };
+});
+ipcMain.handle('account-sign-out', () => signOut());
 
 // The free week starts the first time the app opens.
 function licenseNow() {
@@ -192,8 +250,8 @@ ipcMain.handle('local-ai-ready', () => localAi.isDownloaded(modelDir()));
 
 const { makeKit } = require('./kit-main')({ renderCover, saveAsJpeg });
 require('./quick-main')({ getWin: () => win, loadSettings, saveSettings, need, renderCover, saveAsJpeg, previewCover });
-ipcMain.handle('open-studio', () => win.loadFile(path.join(__dirname, 'ui', 'index.html')));
-ipcMain.handle('open-quick', () => win.loadFile(path.join(__dirname, 'ui', 'quick.html')));
+ipcMain.handle('open-studio', () => (signedIn() ? win.loadFile(path.join(__dirname, 'ui', 'index.html')) : showAccount()));
+ipcMain.handle('open-quick', () => (signedIn() ? win.loadFile(path.join(__dirname, 'ui', 'quick.html')) : showAccount()));
 app.on('before-quit', () => require('../src/fast-translate').stopWorker());
 require('../src/ai').setAiCache(path.join(app.getPath('userData'), 'ai-cache'));
 
