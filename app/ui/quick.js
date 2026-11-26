@@ -317,5 +317,8 @@ $('again').onclick = () => { book = null; result = null; $('bookFound').classLis
 $('gpSite').onclick = () => q.googlePlay('site');
 $('gpFolder').onclick = () => q.googlePlay('folder');
 $('studioBtn').onclick = () => window.gaz.openStudio();
+// the Gaz account this computer is signed in with
+window.gaz.accountInfo().then((a) => { $('accountBtn').textContent = a.email ? `👤 ${a.name || a.email}` : ''; });
+$('accountBtn').onclick = () => { if (confirm('Sign out of your Gaz account on this computer? You will need your email and password to sign in again.')) window.gaz.signOut(); };
 
 init();

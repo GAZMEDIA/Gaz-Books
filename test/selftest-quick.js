@@ -16,6 +16,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   const tt = await require('./test-translator').testTranslator(['fr'], fs.readFileSync(book, 'utf8').slice(0, 400000));
   process.env.GAZBOOK_MODELS_URL = tt.url;
+  require('./signed-in')(require('electron').app.getPath('userData')); // past the Gaz account screen
   require('../app/main.js');
   let driving = false;
   app.on('browser-window-created', (_e, win) => {

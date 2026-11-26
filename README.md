@@ -95,6 +95,17 @@ one-click job, kit-offline = the listing), `app/` is the Electron window
 (`ui/quick.html` is the one-click screens), `translator/` is the on-computer
 translator and the scripts that build its language files. Fonts in `fonts/` are under the SIL Open Font License.
 
+## Gaz account
+
+GazBook opens on a sign-in screen until the person creates a Gaz Media account
+(name, email, phone, publisher, password) or signs in, the same account used to
+download Gaz apps from gazgoc.com.ng. Forgot password emails a 6-digit code.
+The accounts live on the website (GazPresenter Plans plugin 1.14.0+,
+`/wp-json/gazpresenter/v1/account/...`); the app keeps only the sign-in token
+(`src/account.js`, encrypted in settings like the API keys), checks it on each
+start and carries on offline. Sign out: the name at the top right.
+Test: `GAZ_ACCOUNT_BASE=<stand-in>/account electron test/selftest-account.js <outdir>`.
+
 ## Plans
 
 GazBook has a 7-day free trial with everything on. After that a yearly plan

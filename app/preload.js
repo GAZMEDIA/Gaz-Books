@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('gaz', {
   info: () => ipcRenderer.invoke('info'),
   license: () => ipcRenderer.invoke('license-get'),
+  account: (action, details) => ipcRenderer.invoke('account-call', action, details),
+  accountInfo: () => ipcRenderer.invoke('account-info'),
+  signOut: () => ipcRenderer.invoke('account-sign-out'),
   setLicense: (o) => ipcRenderer.invoke('license-set', o),
   getSettings: () => ipcRenderer.invoke('settings-get'),
   setSettings: (s) => ipcRenderer.invoke('settings-set', s),
