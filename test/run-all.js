@@ -146,6 +146,14 @@ require('./mksample');
   const { coverHtml } = require('../src/cover');
   const ready = coverHtml({ ...en.coverSpec, size: require('../src/cover').coverSize({ trim: '6x9', pages: 120 }), image: 'data:image/jpeg;base64,AA', frontReady: true });
   assert.ok(!ready.includes('<h1>') && ready.includes('class="blurb"'));
+  // a kit laid out in tables (Word): the keyword and category columns, not every cell; "About the Book" ends the description
+  const tk = mk.parseKit(['A King: His Reign', '1. Amazon book description', 'Paste into the KDP "Description" box.', 'Are you a king?', '• Rise up.', '2. About the Book (90 words)', 'About it.',
+    'A. 2 Amazon keywords', 'KDP gives you 7 keyword boxes.', '# | Keyword phrase | Search intent | KDP box', '1 | king in the baggage | title | 1', '2 | ruin and reign | subtitle | 1',
+    'B. 2 Amazon categories', '# | Category path | Why it fits', '1 | Religion › Christian Living | fits', '2 | Self-Help › Motivational | fits'].join('\n'));
+  assert.strictEqual(tk.description, 'Are you a king?\n\n• Rise up.');
+  assert.deepStrictEqual(tk.keywords, ['king in the baggage', 'ruin and reign']);
+  assert.deepStrictEqual(tk.categories, ['Religion › Christian Living', 'Self-Help › Motivational']);
+  assert.deepStrictEqual(await mk.translateLines(['#', '1', '• rise'], async (l) => l.map((x) => x.toUpperCase())), ['#', '1', '• RISE']);
   console.log('marketing kit ok');
   console.log('All good.');
 })().catch((e) => { console.error(e); process.exit(1); });
